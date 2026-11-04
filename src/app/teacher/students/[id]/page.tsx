@@ -2,12 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { Avatar, ComingSoon, PageHeader, StatusBadge, formatDate } from "@/components/ui";
+import { LessonList } from "@/components/class/LessonList";
+import { SessionList } from "@/components/class/SessionList";
+import { getLessonHistory } from "@/lib/lesson-history";
+import { getSessions } from "@/lib/sessions";
 import type { Contact, Course, Guardian, Profile, StudentProfile } from "@/lib/types";
 
 export const metadata = { title: "Student" };
 
 export default async function TeacherStudentPage({ params }: { params: Promise<{ id: string }> }) {
-  const { supabase } = await requireRole("teacher");
+  const { supabase, profile } = await requireRole("teacher");
   const { id } = await params;
 
   // RLS returns nothing unless this student is currently assigned to the teacher,
@@ -15,10 +19,12 @@ export default async function TeacherStudentPage({ params }: { params: Promise<{
   const { data: student } = await supabase.from("profiles").select("*").eq("id", id).eq("role", "student").maybeSingle<Profile>();
   if (!student) notFound();
 
-  const [{ data: sp }, { data: contact }, { data: guardians }] = await Promise.all([
+  const [{ data: sp }, { data: contact }, { data: guardians }, history, upcoming] = await Promise.all([
     supabase.from("student_profiles").select("*, course:courses(name, default_duration_min)").eq("user_id", id).maybeSingle(),
     supabase.from("profile_contacts").select("*").eq("user_id", id).maybeSingle<Contact>(),
     supabase.from("guardians").select("*").eq("student_id", id),
+    getLessonHistory(supabase, { studentId: id, limit: 50 }),
+    getSessions(supabase, { from: new Date(), to: new Date(Date.now() + 60 * 86400000), studentId: id }),
   ]);
   const s = sp as (StudentProfile & { course: Pick<Course, "name" | "default_duration_min"> | null }) | null;
 
@@ -82,9 +88,15 @@ export default async function TeacherStudentPage({ params }: { params: Promise<{
             ))}
           </dl>
         </section>
-        <ComingSoon phase={2}>This student&apos;s class history and lesson records will appear here.</ComingSoon>
+        <section className="card">
+          <h2 className="mb-2 font-semibold">Upcoming classes</h2>
+          <SessionList sessions={upcoming.filter((u) => u.status === "scheduled").slice(0, 6)} viewer="teacher" tz={profile.timezone} empty="Nothing scheduled." />
+        </section>
         <ComingSoon phase={3}>Homework and submissions will appear here.</ComingSoon>
       </div>
+      <h2 className="mb-3 mt-8 text-lg font-semibold">Lesson history</h2>
+      <p className="mb-3 text-sm text-muted">Includes classes with previous teachers, so you can review before the next lesson.</p>
+      <LessonList rows={history} viewer="teacher" tz={profile.timezone} empty="No past classes yet." />
     </>
   );
 }

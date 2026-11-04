@@ -72,3 +72,52 @@ insert into public.teacher_students (teacher_id, student_id) values
   ('00000000-0000-4000-a000-000000000011', '00000000-0000-4000-a000-000000000023'),
   ('00000000-0000-4000-a000-000000000012', '00000000-0000-4000-a000-000000000022');
 
+
+-- ---------------------------------------------------------------------------
+-- Phase 2 sample data: availability, classes around today, lesson records.
+-- Times are built in Asia/Manila wall-clock and stored as UTC.
+-- ---------------------------------------------------------------------------
+insert into public.teacher_availability (teacher_id, weekday, start_time, end_time)
+select '00000000-0000-4000-a000-000000000011'::uuid, d, '09:00'::time, '18:00'::time from generate_series(1, 5) d
+union all
+select '00000000-0000-4000-a000-000000000012'::uuid, d, '13:00'::time, '21:00'::time from generate_series(1, 6) d;
+
+insert into public.teacher_blackouts (teacher_id, starts_at, ends_at, reason) values
+  ('00000000-0000-4000-a000-000000000011',
+   ((date_trunc('day', now() at time zone 'Asia/Manila') + interval '10 days') at time zone 'Asia/Manila'),
+   ((date_trunc('day', now() at time zone 'Asia/Manila') + interval '11 days') at time zone 'Asia/Manila'),
+   'Training day');
+
+with base as (select date_trunc('day', now() at time zone 'Asia/Manila') as d),
+s(id, teacher, student, course, day_offset, hh, status) as (values
+  ('20000000-0000-4000-a000-000000000001'::uuid, '00000000-0000-4000-a000-000000000011'::uuid, '00000000-0000-4000-a000-000000000021'::uuid, '10000000-0000-4000-a000-000000000002'::uuid, -7, 10, 'completed'),
+  ('20000000-0000-4000-a000-000000000002'::uuid, '00000000-0000-4000-a000-000000000011'::uuid, '00000000-0000-4000-a000-000000000021'::uuid, '10000000-0000-4000-a000-000000000002'::uuid, -3, 10, 'completed'),
+  ('20000000-0000-4000-a000-000000000003'::uuid, '00000000-0000-4000-a000-000000000011'::uuid, '00000000-0000-4000-a000-000000000021'::uuid, '10000000-0000-4000-a000-000000000002'::uuid,  1, 10, 'scheduled'),
+  ('20000000-0000-4000-a000-000000000004'::uuid, '00000000-0000-4000-a000-000000000011'::uuid, '00000000-0000-4000-a000-000000000021'::uuid, '10000000-0000-4000-a000-000000000002'::uuid,  4, 10, 'scheduled'),
+  ('20000000-0000-4000-a000-000000000005'::uuid, '00000000-0000-4000-a000-000000000011'::uuid, '00000000-0000-4000-a000-000000000023'::uuid, '10000000-0000-4000-a000-000000000001'::uuid,  0, 15, 'scheduled'),
+  ('20000000-0000-4000-a000-000000000006'::uuid, '00000000-0000-4000-a000-000000000011'::uuid, '00000000-0000-4000-a000-000000000023'::uuid, '10000000-0000-4000-a000-000000000001'::uuid, -2, 15, 'student_absent'),
+  ('20000000-0000-4000-a000-000000000007'::uuid, '00000000-0000-4000-a000-000000000012'::uuid, '00000000-0000-4000-a000-000000000022'::uuid, '10000000-0000-4000-a000-000000000003'::uuid,  0, 18, 'scheduled'),
+  ('20000000-0000-4000-a000-000000000008'::uuid, '00000000-0000-4000-a000-000000000012'::uuid, '00000000-0000-4000-a000-000000000022'::uuid, '10000000-0000-4000-a000-000000000003'::uuid,  2, 18, 'cancelled')
+)
+insert into public.class_sessions (id, teacher_id, student_id, course_id, starts_at, ends_at, status, meeting_url, created_by)
+select s.id, s.teacher, s.student, s.course,
+       ((base.d + make_interval(days => s.day_offset, hours => s.hh)) at time zone 'Asia/Manila'),
+       ((base.d + make_interval(days => s.day_offset, hours => s.hh, mins => 50)) at time zone 'Asia/Manila'),
+       s.status::public.session_status,
+       'https://meet.google.com/abc-defg-hij',
+       '00000000-0000-4000-a000-000000000001'
+from s, base;
+
+insert into public.lesson_records (session_id, today_objectives, today_topics, today_activities, today_vocab_grammar, today_skills,
+  feedback_overall, feedback_strengths, feedback_improve, feedback_corrections, feedback_pronunciation, feedback_next, shared_with_student) values
+  ('20000000-0000-4000-a000-000000000001', 'Plan and write an IELTS Task 2 opinion essay', 'Task 2 structure; thesis statements', 'Brainstormed ideas; wrote an introduction and one body paragraph', 'Linking words: however, moreover, consequently', array['writing','speaking'],
+   'Good progress; ideas are clear', 'Clear position; good examples', 'Paragraph cohesion', '"peoples" -> "people"; "make a research" -> "do research"', 'Clear; work on word stress in "development"', 'Finish the essay and review conclusions', true),
+  ('20000000-0000-4000-a000-000000000002', 'Write strong conclusions; Speaking Part 2 practice', 'Conclusions; cue-card strategy', 'Rewrote conclusion; two cue-card attempts', 'Hedging language: tend to, it could be argued', array['writing','speaking'],
+   'Solid band 6.5 writing; speaking fluent but repetitive', 'Confident delivery', 'Range of vocabulary in Speaking', '"In conclusion, I am agree" -> "I agree"', 'Good intonation; final consonants sometimes dropped', 'Speaking Part 3 abstract questions; vocabulary for "environment"', true);
+
+select public.ensure_lesson_record('20000000-0000-4000-a000-000000000003');
+
+insert into public.materials (session_id, title, unit_chapter, pages, kind, url, uploaded_by) values
+  ('20000000-0000-4000-a000-000000000003', 'Cambridge IELTS 18', 'Test 2, Speaking', 'pp. 54-56', 'link', 'https://www.cambridge.org/', '00000000-0000-4000-a000-000000000011');
+insert into public.videos (session_id, youtube_id, title, description, added_by) values
+  ('20000000-0000-4000-a000-000000000003', 'aqz-KE-bpKQ', 'Speaking Part 3: extending your answers', 'Watch before class and note three phrases.', '00000000-0000-4000-a000-000000000011');

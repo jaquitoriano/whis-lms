@@ -10,7 +10,9 @@
     "test:rls": "node --test tests/rls.test.mjs",
     "db:start": "supabase start",
     "db:reset": "supabase db reset",
-    "db:stop": "supabase stop"
+    "db:stop": "supabase stop",
+    "test:smoke": "node tests/smoke.mjs",
+    "test:e2e": "node tests/e2e.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
@@ -28,6 +30,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
+    "playwright": "^1.48.2",
     "supabase": "^2.48.3",
     "tailwindcss": "^4",
     "typescript": "^5"

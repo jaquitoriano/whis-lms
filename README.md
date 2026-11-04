@@ -9,8 +9,9 @@ Stack: Next.js 15 (App Router, TypeScript, Tailwind) and Supabase (Postgres with
 |---|---|---|
 | 0 | Setup, login, roles, database access rules | Done |
 | 1 | Public site, teacher/student profiles, basic admin (users, assignments, courses, inquiries, settings) | Done |
-| 2 | Calendar, scheduling, lesson records, materials | Next |
-| 3–7 | Homework, notifications, contracts/billing, progress, extras | Planned (shown as "coming soon" in the portals) |
+| 2 | Calendars (day/week/month), scheduling with double-booking prevention, teacher availability and blocked dates, class pages, three-part lesson records with autosave, materials (files and links), YouTube videos, reschedule and cancel | Done |
+| 3 | Homework: assign, submit, review, revision, history | Next |
+| 4–7 | Notifications, contracts/billing, progress, extras | Planned (shown as "coming soon" in the portals) |
 
 ## First-time setup (Windows)
 
@@ -62,3 +63,23 @@ Run it after every database change.
 - Students see their teacher's email and phone only if the admin turns that on (Website settings). It is off by default.
 - Setting an account to Inactive blocks login immediately. On hold still allows login, with a notice.
 - Privacy policy and terms pages are placeholders and must be replaced before real student data is entered.
+
+## Tests
+
+| Command | What it checks | Needs |
+|---|---|---|
+| `npm run test:rls` | 21 database privacy rules (who can see and change what, double-booking, private files) | local database |
+| `npm run test:smoke` | Every portal page renders the right content for each role, and other people's pages are refused | local database + `npm run dev` |
+| `npm run test:e2e` | Real browser walk-through: schedule, autosave notes, upload, YouTube, complete, student view, reschedule | local database + `npm run dev`; first run `npx playwright install chromium` |
+
+Run `npm run db:reset` first if you have changed data by hand: the tests expect the seed data.
+
+## Decisions made for Phase 2 (change if needed)
+
+- Teachers can schedule, edit, cancel and reschedule their own classes with their assigned students. Admins can turn off adding and rescheduling for teachers in Website settings. Students view only and contact the school to change a class.
+- Classes outside a teacher's available hours, or in a blocked period, ask for confirmation ("Schedule anyway"). Overlapping classes for the same teacher or student are always refused by the database.
+- Rescheduling keeps the original class (marked Rescheduled) and creates a linked new one; materials and videos move to the new time.
+- "Teacher absent" can only be recorded by an admin.
+- Lesson notes are visible to the student once the teacher ticks "Visible to student" or marks the class completed. Private notes are never shown to students.
+- Material files are private: they open through links that expire after one hour. Up to 25 MB per file (PDF, Word, PowerPoint, images, audio).
+- Videos are YouTube embeds only (privacy-enhanced youtube-nocookie.com player); nothing is hosted by the school.
