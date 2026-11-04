@@ -121,3 +121,45 @@ insert into public.materials (session_id, title, unit_chapter, pages, kind, url,
   ('20000000-0000-4000-a000-000000000003', 'Cambridge IELTS 18', 'Test 2, Speaking', 'pp. 54-56', 'link', 'https://www.cambridge.org/', '00000000-0000-4000-a000-000000000011');
 insert into public.videos (session_id, youtube_id, title, description, added_by) values
   ('20000000-0000-4000-a000-000000000003', 'aqz-KE-bpKQ', 'Speaking Part 3: extending your answers', 'Watch before class and note three phrases.', '00000000-0000-4000-a000-000000000011');
+
+-- ---------------------------------------------------------------------------
+-- Phase 3 sample homework: one finished after a revision, one waiting for review,
+-- one open, one overdue.
+-- ---------------------------------------------------------------------------
+select set_config('app.homework_workflow', 'on', false);
+
+insert into public.homework_assignments (id, session_id, teacher_id, student_id, title, instructions, requirements, due_at, is_required, status) values
+  ('30000000-0000-4000-a000-000000000001', '20000000-0000-4000-a000-000000000001', '00000000-0000-4000-a000-000000000011', '00000000-0000-4000-a000-000000000021',
+   'Task 2 essay: remote work', E'Write an opinion essay:\n\n**Some people believe working from home is better than working in an office. To what extent do you agree?**\n\n- Plan for 5 minutes\n- Use at least three linking words from class', '250 words minimum, 40 minutes',
+   now() - interval '5 days', true, 'completed'),
+  ('30000000-0000-4000-a000-000000000002', '20000000-0000-4000-a000-000000000002', '00000000-0000-4000-a000-000000000011', '00000000-0000-4000-a000-000000000021',
+   'Speaking Part 2 recording', E'Record yourself answering the cue card **"Describe a place you like to visit"**. Speak for 2 minutes.', 'Audio file or written notes',
+   now() - interval '1 day', true, 'submitted'),
+  ('30000000-0000-4000-a000-000000000003', '20000000-0000-4000-a000-000000000003', '00000000-0000-4000-a000-000000000011', '00000000-0000-4000-a000-000000000021',
+   'Vocabulary: environment', E'Learn the 15 words on the worksheet and write one sentence for each.\n\nSee the reference link below.', '',
+   now() + interval '3 days', true, 'assigned'),
+  ('30000000-0000-4000-a000-000000000004', '20000000-0000-4000-a000-000000000006', '00000000-0000-4000-a000-000000000011', '00000000-0000-4000-a000-000000000023',
+   'Past simple practice', E'Complete exercises 1–3 on page 24 of your workbook. You can take a photo of your answers.', '',
+   now() - interval '1 day', true, 'assigned'),
+  ('30000000-0000-4000-a000-000000000005', null, '00000000-0000-4000-a000-000000000011', '00000000-0000-4000-a000-000000000023',
+   'Optional: read a short story', E'Read any short story in English and tell me about it next class.', '',
+   now() + interval '6 days', false, 'assigned');
+
+insert into public.homework_submissions (id, assignment_id, version, answer_text, is_draft, submitted_at, is_late) values
+  ('31000000-0000-4000-a000-000000000001', '30000000-0000-4000-a000-000000000001', 1,
+   E'Nowadays many peoples work from home. I am agree that it is better because they save time.\n\nHowever, some people feel lonely.', false, now() - interval '6 days', false),
+  ('31000000-0000-4000-a000-000000000002', '30000000-0000-4000-a000-000000000001', 2,
+   E'Nowadays, many people work from home, and I largely agree that this is better.\n\nFirstly, they save time commuting. Moreover, they can focus without office noise. However, some people feel isolated, so a mix of both may be ideal.\n\nIn conclusion, working from home has clear advantages.', false, now() - interval '4 days', true),
+  ('31000000-0000-4000-a000-000000000003', '30000000-0000-4000-a000-000000000002', 1,
+   E'My notes: I like to visit Kyoto. It is quiet, there are many temples, I go with my family every spring.', false, now() - interval '2 days', false);
+
+insert into public.homework_reviews (submission_id, reviewer_id, comments, corrections, decision, sent_at) values
+  ('31000000-0000-4000-a000-000000000001', '00000000-0000-4000-a000-000000000011',
+   'Good start, but the essay is too short. Please develop each idea into a full paragraph.', E'"peoples" → "people"\n"I am agree" → "I agree"', 'needs_revision', now() - interval '5 days'),
+  ('31000000-0000-4000-a000-000000000002', '00000000-0000-4000-a000-000000000011',
+   'Much better structure and good linking words. Band 6.5 level. Next time, add a specific example in each body paragraph.', '', 'completed', now() - interval '3 days');
+
+insert into public.homework_files (assignment_id, kind, title, url, uploaded_by) values
+  ('30000000-0000-4000-a000-000000000003', 'reference', 'Environment vocabulary list', 'https://dictionary.cambridge.org/', '00000000-0000-4000-a000-000000000011');
+
+select set_config('app.homework_workflow', 'off', false);

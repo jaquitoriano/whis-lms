@@ -8,7 +8,7 @@ const nav: NavItem[] = [
   { href: "/student/calendar", label: "My Calendar" },
   { href: "/student/materials", label: "Lesson Materials" },
   { href: "/student/lessons", label: "Lesson History" },
-  { href: "/student/homework", label: "Homework", phase: 3 },
+  { href: "/student/homework", label: "Homework" },
   { href: "/student/policies", label: "Class Policies", phase: 4 },
   { href: "/student/contract", label: "My Contract", phase: 5 },
   { href: "/student/progress", label: "My Progress", phase: 6 },

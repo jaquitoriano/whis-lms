@@ -10,7 +10,7 @@ const nav: NavItem[] = [
   { href: "/admin/settings", label: "Website settings" },
   { href: "/admin/schedules", label: "Class schedules" },
   { href: "/admin/lessons", label: "Lesson records" },
-  { href: "/admin/homework", label: "Homework monitoring", phase: 3 },
+  { href: "/admin/homework", label: "Homework monitoring" },
   { href: "/admin/announcements", label: "Announcements", phase: 4 },
   { href: "/admin/attendance", label: "Attendance", phase: 5 },
   { href: "/admin/billing", label: "Payments and billing", phase: 5 },

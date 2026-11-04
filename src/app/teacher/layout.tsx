@@ -8,7 +8,7 @@ const nav: NavItem[] = [
   { href: "/teacher/calendar", label: "My Calendar" },
   { href: "/teacher/availability", label: "Available Hours" },
   { href: "/teacher/lessons", label: "Lesson Records" },
-  { href: "/teacher/homework", label: "Homework", phase: 3 },
+  { href: "/teacher/homework", label: "Homework" },
   { href: "/teacher/policies", label: "Class Policies", phase: 4 },
   { href: "/teacher/progress", label: "Student Progress", phase: 6 },
   { href: "/teacher/messages", label: "Messages", phase: 6 },

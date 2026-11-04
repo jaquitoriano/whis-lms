@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
-import { Avatar, ComingSoon, PageHeader, StatusBadge, formatDate } from "@/components/ui";
+import { Avatar, PageHeader, StatusBadge, formatDate } from "@/components/ui";
 import { LessonList } from "@/components/class/LessonList";
 import { SessionList } from "@/components/class/SessionList";
 import { getLessonHistory } from "@/lib/lesson-history";
 import { getSessions } from "@/lib/sessions";
+import { listHomework } from "@/lib/homework";
+import { HomeworkTable } from "@/components/homework/HomeworkTable";
 import type { Contact, Course, Guardian, Profile, StudentProfile } from "@/lib/types";
 
 export const metadata = { title: "Student" };
@@ -26,6 +28,7 @@ export default async function TeacherStudentPage({ params }: { params: Promise<{
     getLessonHistory(supabase, { studentId: id, limit: 50 }),
     getSessions(supabase, { from: new Date(), to: new Date(Date.now() + 60 * 86400000), studentId: id }),
   ]);
+  const homework = await listHomework(supabase, { studentId: id });
   const s = sp as (StudentProfile & { course: Pick<Course, "name" | "default_duration_min"> | null }) | null;
 
   return (
@@ -92,8 +95,14 @@ export default async function TeacherStudentPage({ params }: { params: Promise<{
           <h2 className="mb-2 font-semibold">Upcoming classes</h2>
           <SessionList sessions={upcoming.filter((u) => u.status === "scheduled").slice(0, 6)} viewer="teacher" tz={profile.timezone} empty="Nothing scheduled." />
         </section>
-        <ComingSoon phase={3}>Homework and submissions will appear here.</ComingSoon>
       </div>
+      <div className="mb-3 mt-8 flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">Homework</h2>
+        <Link href={`/teacher/homework/new?student=${id}`} className="btn-secondary">
+          Assign homework
+        </Link>
+      </div>
+      <HomeworkTable rows={[...homework].reverse()} viewer="teacher" tz={profile.timezone} empty="No homework yet." />
       <h2 className="mb-3 mt-8 text-lg font-semibold">Lesson history</h2>
       <p className="mb-3 text-sm text-muted">Includes classes with previous teachers, so you can review before the next lesson.</p>
       <LessonList rows={history} viewer="teacher" tz={profile.timezone} empty="No past classes yet." />
