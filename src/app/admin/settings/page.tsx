@@ -11,7 +11,10 @@ async function saveSettings(_prev: ActionState, formData: FormData): Promise<Act
   const { supabase } = await requireRole("admin");
   const { error } = await supabase
     .from("settings")
-    .upsert({ key: "students_can_view_teacher_contact", value: formData.get("students_can_view_teacher_contact") === "on" });
+    .upsert([
+      { key: "students_can_view_teacher_contact", value: formData.get("students_can_view_teacher_contact") === "on" },
+      { key: "teachers_can_schedule", value: formData.get("teachers_can_schedule") === "on" },
+    ]);
   if (error) return { error: "Could not save settings." };
   revalidatePath("/admin/settings");
   return { ok: true, message: "Settings saved." };
@@ -25,13 +28,20 @@ export default async function SettingsPage() {
     <>
       <PageHeader title="Website settings" description="School name, colours, FAQ and contact details are set in src/config/site.ts for now." />
       <section className="card max-w-xl">
-        <h2 className="mb-4 font-semibold">Privacy</h2>
+        <h2 className="mb-4 font-semibold">Privacy and permissions</h2>
         <ActionForm action={saveSettings}>
           <label className="flex items-start gap-3 text-sm">
             <input type="checkbox" name="students_can_view_teacher_contact" defaultChecked={map.students_can_view_teacher_contact === true} className="mt-1" />
             <span>
               <span className="font-medium">Students can see their teacher&apos;s email and phone</span>
               <span className="block text-muted">When off, students see their teacher&apos;s name, photo and profile only.</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 text-sm">
+            <input type="checkbox" name="teachers_can_schedule" defaultChecked={map.teachers_can_schedule !== false} className="mt-1" />
+            <span>
+              <span className="font-medium">Teachers can schedule their own classes</span>
+              <span className="block text-muted">When off, only the school office can add or reschedule classes. Teachers can still complete and cancel them.</span>
             </span>
           </label>
         </ActionForm>

@@ -177,3 +177,132 @@ test("admin-created accounts get the requested role and profile rows", async () 
     await svc.auth.admin.deleteUser(data.user.id);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Phase 2: classes, lesson records, materials
+// ---------------------------------------------------------------------------
+const SESSION = {
+  kenjiDone1: "20000000-0000-4000-a000-000000000001",
+  kenjiUpcoming: "20000000-0000-4000-a000-000000000003",
+  anaToday: "20000000-0000-4000-a000-000000000007",
+};
+
+test("student sees only their own classes", async () => {
+  const kenji = await as("student1@school.test");
+  const { data } = await kenji.from("class_sessions").select("student_id");
+  assert.ok(data.length > 0);
+  assert.ok(data.every((r) => r.student_id === ID.kenji));
+  const ana = await kenji.from("class_sessions").select("id").eq("id", SESSION.anaToday);
+  assert.equal(ana.data.length, 0);
+});
+
+test("student cannot create, edit or cancel classes", async () => {
+  const kenji = await as("student1@school.test");
+  const ins = await kenji.from("class_sessions").insert({
+    teacher_id: ID.maria, student_id: ID.kenji, starts_at: "2030-01-01T01:00:00Z", ends_at: "2030-01-01T01:50:00Z",
+  });
+  assert.ok(ins.error);
+  const upd = await kenji.from("class_sessions").update({ status: "cancelled" }).eq("id", SESSION.kenjiUpcoming).select();
+  assert.equal((upd.data ?? []).length, 0);
+});
+
+test("student reads shared lesson records but not private notes or unshared drafts", async () => {
+  const kenji = await as("student1@school.test");
+  const shared = await kenji.from("lesson_records").select("session_id").eq("session_id", SESSION.kenjiDone1);
+  assert.equal(shared.data.length, 1);
+  const draft = await kenji.from("lesson_records").select("session_id").eq("session_id", SESSION.kenjiUpcoming);
+  assert.equal(draft.data.length, 0, "unshared record hidden");
+  const priv = await kenji.from("lesson_private_notes").select("*");
+  assert.equal(priv.data.length, 0);
+  const write = await kenji.from("lesson_records").update({ feedback_overall: "hacked" }).eq("session_id", SESSION.kenjiDone1).select();
+  assert.equal((write.data ?? []).length, 0);
+});
+
+test("teacher cannot see or book another teacher's student", async () => {
+  const maria = await as("teacher1@school.test");
+  const r = await maria.from("class_sessions").select("id").eq("id", SESSION.anaToday);
+  assert.equal(r.data.length, 0);
+  const ins = await maria.from("class_sessions").insert({
+    teacher_id: ID.maria, student_id: ID.ana, starts_at: "2030-01-01T01:00:00Z", ends_at: "2030-01-01T01:50:00Z",
+  });
+  assert.ok(ins.error);
+  const forOther = await maria.from("class_sessions").insert({
+    teacher_id: ID.james, student_id: ID.ana, starts_at: "2030-01-01T01:00:00Z", ends_at: "2030-01-01T01:50:00Z",
+  });
+  assert.ok(forOther.error, "cannot book on behalf of another teacher");
+});
+
+test("double-booking is rejected by the database", async () => {
+  const maria = await as("teacher1@school.test");
+  const a = await maria.from("class_sessions").insert({
+    teacher_id: ID.maria, student_id: ID.kenji, starts_at: "2030-02-01T01:00:00Z", ends_at: "2030-02-01T01:50:00Z",
+  }).select("id").single();
+  assert.equal(a.error, null);
+  try {
+    const clashTeacher = await maria.from("class_sessions").insert({
+      teacher_id: ID.maria, student_id: ID.minjun, starts_at: "2030-02-01T01:30:00Z", ends_at: "2030-02-01T02:20:00Z",
+    });
+    assert.equal(clashTeacher.error?.code, "23P01");
+    const james = await as("teacher2@school.test");
+    const admin = await as("admin@school.test");
+    await admin.from("teacher_students").insert({ teacher_id: ID.james, student_id: ID.kenji });
+    const clashStudent = await james.from("class_sessions").insert({
+      teacher_id: ID.james, student_id: ID.kenji, starts_at: "2030-02-01T01:10:00Z", ends_at: "2030-02-01T01:40:00Z",
+    });
+    assert.equal(clashStudent.error?.code, "23P01", "student can't be in two classes at once");
+    await admin.from("teacher_students").delete().eq("teacher_id", ID.james).eq("student_id", ID.kenji);
+  } finally {
+    const admin = await as("admin@school.test");
+    await admin.from("class_sessions").delete().eq("id", a.data.id);
+  }
+});
+
+test("teacher cannot record a teacher absence; reschedule keeps history", async () => {
+  const maria = await as("teacher1@school.test");
+  const s = await maria.from("class_sessions").insert({
+    teacher_id: ID.maria, student_id: ID.kenji, starts_at: "2030-03-01T01:00:00Z", ends_at: "2030-03-01T01:50:00Z",
+  }).select("id").single();
+  const admin = await as("admin@school.test");
+  try {
+    const abs = await maria.from("class_sessions").update({ status: "teacher_absent" }).eq("id", s.data.id);
+    assert.ok(abs.error);
+    const r = await maria.rpc("reschedule_session", { p_session: s.data.id, p_starts: "2030-03-02T01:00:00Z", p_ends: "2030-03-02T01:50:00Z" });
+    assert.equal(r.error, null);
+    const old = await maria.from("class_sessions").select("status").eq("id", s.data.id).single();
+    assert.equal(old.data.status, "rescheduled");
+    const moved = await maria.from("class_sessions").select("rescheduled_from_id").eq("id", r.data).single();
+    assert.equal(moved.data.rescheduled_from_id, s.data.id);
+    await admin.from("class_sessions").delete().eq("id", r.data);
+  } finally {
+    await admin.from("class_sessions").delete().eq("id", s.data.id);
+  }
+});
+
+test("lesson record prefills Previous lesson from the last completed class", async () => {
+  const maria = await as("teacher1@school.test");
+  const { data } = await maria.from("lesson_records").select("previous_session_id, previous_summary").eq("session_id", SESSION.kenjiUpcoming).single();
+  assert.equal(data.previous_session_id, "20000000-0000-4000-a000-000000000002");
+  assert.match(data.previous_summary, /conclusions/i);
+});
+
+test("material files are private to the class", async () => {
+  const maria = await as("teacher1@school.test");
+  const path = `${SESSION.kenjiUpcoming}/rls-test.pdf`;
+  const up = await maria.storage.from("materials").upload(path, new Blob(["%PDF-1.4"], { type: "application/pdf" }), { contentType: "application/pdf", upsert: true });
+  assert.equal(up.error, null);
+  try {
+    const kenji = await as("student1@school.test");
+    const ok = await kenji.storage.from("materials").createSignedUrl(path, 60);
+    assert.equal(ok.error, null, "own student can open it");
+    const ana = await as("student2@school.test");
+    const no = await ana.storage.from("materials").createSignedUrl(path, 60);
+    assert.ok(no.error, "another student cannot");
+    const james = await as("teacher2@school.test");
+    const no2 = await james.storage.from("materials").createSignedUrl(path, 60);
+    assert.ok(no2.error, "another teacher cannot");
+    const sneaky = await ana.storage.from("materials").upload(`${SESSION.kenjiUpcoming}/x.pdf`, new Blob(["x"], { type: "application/pdf" }), { contentType: "application/pdf" });
+    assert.ok(sneaky.error, "students cannot upload into a class");
+  } finally {
+    await maria.storage.from("materials").remove([path]);
+  }
+});
