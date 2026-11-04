@@ -3,13 +3,14 @@ import { notFound } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ActionForm } from "@/components/ActionForm";
 import { SubmitButton } from "@/components/SubmitButton";
-import { ComingSoon } from "@/components/ui";
 import { LessonRecordEditor } from "./LessonRecordEditor";
 import { MaterialUploader } from "./MaterialUploader";
 import { StatusPanel } from "./StatusPanel";
 import { getSession, statusLabel, statusStyle, classPath } from "@/lib/sessions";
 import { LESSON_SECTIONS, type LessonRecord } from "@/lib/lesson-fields";
 import { formatDateTime, minutesBetween, toDateStr, toTimeStr, tzLabel } from "@/lib/time";
+import { listHomework } from "@/lib/homework";
+import { HomeworkStatusBadges } from "@/components/homework/HomeworkTable";
 import { addMaterialLink, addVideo, deleteMaterial, deleteVideo, updateMeetingLink } from "@/lib/session-actions";
 import type { Profile } from "@/lib/types";
 
@@ -49,6 +50,8 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
     canManage ? supabase.from("lesson_private_notes").select("notes").eq("session_id", id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from("class_sessions").select("id").eq("rescheduled_from_id", id).maybeSingle(),
   ]);
+  const homework = await listHomework(supabase, { sessionId: id });
+  const isOwnerTeacher = viewer.role === "teacher" && s.teacher_id === viewer.id;
   const mats = (materials ?? []) as Material[];
   const vids = (videos ?? []) as Video[];
   const rec = record as LessonRecord | null;
@@ -277,7 +280,32 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
         )}
       </section>
 
-      <ComingSoon phase={3}>Homework for this class will appear here.</ComingSoon>
+      <section className="card">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="font-semibold">Homework</h2>
+          {isOwnerTeacher && (
+            <Link href={`/teacher/homework/new?session=${id}`} className="btn-primary">
+              Assign homework
+            </Link>
+          )}
+        </div>
+        {homework.length === 0 ? (
+          <p className="text-sm text-muted">No homework for this class.</p>
+        ) : (
+          <ul className="divide-y divide-border text-sm">
+            {homework.map((h) => (
+              <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <Link href={`/${viewer.role}/homework/${h.id}`} className="font-medium text-brand-700 hover:underline">
+                  {h.title}
+                </Link>
+                <span className="flex items-center gap-2 text-xs text-muted">
+                  due {formatDateTime(h.due_at, tz)} <HomeworkStatusBadges h={h} />
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

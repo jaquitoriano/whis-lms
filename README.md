@@ -10,8 +10,9 @@ Stack: Next.js 15 (App Router, TypeScript, Tailwind) and Supabase (Postgres with
 | 0 | Setup, login, roles, database access rules | Done |
 | 1 | Public site, teacher/student profiles, basic admin (users, assignments, courses, inquiries, settings) | Done |
 | 2 | Calendars (day/week/month), scheduling with double-booking prevention, teacher availability and blocked dates, class pages, three-part lesson records with autosave, materials (files and links), YouTube videos, reschedule and cancel | Done |
-| 3 | Homework: assign, submit, review, revision, history | Next |
-| 4–7 | Notifications, contracts/billing, progress, extras | Planned (shown as "coming soon" in the portals) |
+| 3 | Homework: assign from a class or on its own, reference files, student drafts with autosave, file and photo uploads, submit, teacher review with corrections and corrected files, revision loop with every version kept, admin monitoring | Done |
+| 4 | Admin dashboard extras, announcements, notifications (in-app + email), class policies | Next |
+| 5–7 | Contracts/billing, progress, extras | Planned (shown as "coming soon" in the portals) |
 
 ## First-time setup (Windows)
 
@@ -68,9 +69,10 @@ Run it after every database change.
 
 | Command | What it checks | Needs |
 |---|---|---|
-| `npm run test:rls` | 21 database privacy rules (who can see and change what, double-booking, private files) | local database |
+| `npm run test:rls` | 27 database privacy rules (who can see and change what, double-booking, private files, the homework workflow) | local database |
 | `npm run test:smoke` | Every portal page renders the right content for each role, and other people's pages are refused | local database + `npm run dev` |
 | `npm run test:e2e` | Real browser walk-through: schedule, autosave notes, upload, YouTube, complete, student view, reschedule | local database + `npm run dev`; first run `npx playwright install chromium` |
+| `npm run test:e2e:homework` | Real browser walk-through of homework: assign, draft, photo upload, submit, review, revision, version 2, complete | same as above |
 
 Run `npm run db:reset` first if you have changed data by hand: the tests expect the seed data.
 
@@ -83,3 +85,15 @@ Run `npm run db:reset` first if you have changed data by hand: the tests expect 
 - Lesson notes are visible to the student once the teacher ticks "Visible to student" or marks the class completed. Private notes are never shown to students.
 - Material files are private: they open through links that expire after one hour. Up to 25 MB per file (PDF, Word, PowerPoint, images, audio).
 - Videos are YouTube embeds only (privacy-enhanced youtube-nocookie.com player); nothing is hosted by the school.
+
+## Decisions made for Phase 3 (from the homework user stories doc, 4 Nov 2026)
+
+- No scores or grades on homework: written feedback only. Homework is kept separate from progress reports.
+- Late submission is allowed and marked **Late**. Required homework past its deadline shows as **Overdue**.
+- Before anything is submitted the teacher can edit or withdraw homework. After a submission only the deadline can change.
+- Each hand-in is saved as its own version and can't be edited afterwards. The student works on one draft at a time (autosaved).
+- The teacher's feedback is a private draft until they choose **Request revision** or **Mark completed**. After that it can't be edited.
+- Files: up to 25 MB each, kept indefinitely. iPhone (HEIC) photos are converted to JPEG in the browser before upload.
+- Admins can see all homework but not change it.
+- Not yet built (Phase 4): notifications for new homework, submissions, deadlines and feedback. Guardians will not receive homework emails.
+- Inline highlighting inside a student's answer (a "Should" story) is not built. Teachers write corrections in the Corrections box or upload a marked-up file.

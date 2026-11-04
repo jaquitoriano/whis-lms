@@ -35,6 +35,10 @@ const S7 = "20000000-0000-4000-a000-000000000007"; // Ana with James
 const KENJI = "00000000-0000-4000-a000-000000000021";
 const MINJUN = "00000000-0000-4000-a000-000000000023";
 const ANA = "00000000-0000-4000-a000-000000000022";
+const HW1 = "30000000-0000-4000-a000-000000000001"; // Kenji, completed after a revision
+const HW2 = "30000000-0000-4000-a000-000000000002"; // Kenji, submitted, waiting for review
+const HW3 = "30000000-0000-4000-a000-000000000003"; // Kenji, open
+const HW4 = "30000000-0000-4000-a000-000000000004"; // Min-jun, overdue
 
 const mustHave = [
   ["admin@school.test", "/admin", ["Classes today", "Past classes not closed", "Students without a teacher"]],
@@ -62,6 +66,24 @@ const mustHave = [
   ["student1@school.test", "/student/materials", ["Cambridge IELTS 18", "Speaking Part 3"]],
   ["student1@school.test", "/student/lessons", ["Lesson history", "Maria Santos"]],
   ["student1@school.test", "/student/teacher", ["Maria Santos"]],
+  ["teacher1@school.test", "/teacher/homework", ["To review", "Speaking Part 2 recording"]],
+  ["teacher1@school.test", "/teacher/homework?tab=student", ["Vocabulary: environment", "Past simple practice", "Overdue"]],
+  ["teacher1@school.test", "/teacher/homework?tab=completed", ["Task 2 essay: remote work"]],
+  ["teacher1@school.test", "/teacher/homework/new", ["Assign homework", "Deadline"]],
+  ["teacher1@school.test", `/teacher/homework/new?session=${S3}`, ["Kenji Tanaka", "Attach links from this class", "Cambridge IELTS 18"]],
+  ["teacher1@school.test", `/teacher/homework/${HW2}`, ["Review version", "Request revision", "Kyoto", "Upload corrected file"]],
+  ["teacher1@school.test", `/teacher/homework/${HW1}`, ["Submission history", "Revision requested", "Change deadline", "I am agree"]],
+  ["teacher1@school.test", `/teacher/classes/${S3}`, ["Vocabulary: environment", "Assign homework"]],
+  ["teacher1@school.test", `/teacher/students/${KENJI}`, ["Homework", "Task 2 essay"]],
+  ["teacher1@school.test", "/teacher", ["Homework to review", "Speaking Part 2 recording"]],
+  ["student1@school.test", "/student/homework", ["Vocabulary: environment"]],
+  ["student1@school.test", "/student/homework?tab=completed", ["Task 2 essay: remote work"]],
+  ["student1@school.test", `/student/homework/${HW3}`, ["Your work", "Submit homework", "Add files or photos", "Environment vocabulary list"]],
+  ["student1@school.test", `/student/homework/${HW1}`, ["Teacher feedback", "I am agree", "Band 6.5", "Late"]],
+  ["student1@school.test", "/student", ["Homework to do", "Vocabulary: environment"]],
+  ["student1@school.test", "/student/calendar?view=month", ["Due "]],
+  ["admin@school.test", "/admin/homework", ["Homework monitoring", "Overdue (required)", "Past simple practice"]],
+  ["admin@school.test", `/admin/homework/${HW1}`, ["Submission history", "Band 6.5"]],
 ];
 const refused = [
   ["teacher1@school.test", `/teacher/students/${ANA}`, (r) => r.status === 404, "teacher opening another teacher's student -> 404"],
@@ -69,10 +91,14 @@ const refused = [
   ["student1@school.test", `/student/classes/${S7}`, (r) => r.status === 404, "student opening another student's class -> 404"],
   ["student1@school.test", "/admin", (r) => r.status === 307 && r.loc.includes("/student"), "student opening /admin -> redirected"],
   ["teacher1@school.test", "/admin/users", (r) => r.status === 307 && r.loc.includes("/teacher"), "teacher opening admin -> redirected"],
+  ["student2@school.test", `/student/homework/${HW1}`, (r) => r.status === 404, "student opening another student's homework -> 404"],
+  ["teacher2@school.test", `/teacher/homework/${HW1}`, (r) => r.status === 404, "teacher opening another teacher's homework -> 404"],
 ];
 const mustNotHave = [
   ["student1@school.test", `/student/classes/${S3}`, ["Mark completed", "Private notes", "Upload file"], "student class page has no edit controls"],
   ["teacher1@school.test", `/teacher/classes/${S3}`, ["Teacher absent"], "teacher can't mark teacher absent"],
+  ["admin@school.test", `/admin/homework/${HW2}`, ["Request revision", "Upload corrected file", "Withdraw"], "admin homework view is read-only"],
+  ["student1@school.test", `/student/homework/${HW2}`, ["Request revision", "Submit homework"], "student can't review or resubmit while under review"],
 ];
 
 const cookies = {};

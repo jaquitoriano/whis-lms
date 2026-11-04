@@ -11,6 +11,7 @@ const actionLabel: Record<string, string> = {
   "assignment.update": "Assignment changed",
   "assignment.delete": "Assignment removed",
   "session.status": "Class status changed",
+  "homework.status": "Homework status changed",
 };
 
 export default async function AdminDashboard() {
@@ -26,7 +27,7 @@ export default async function AdminDashboard() {
     supabase.from("teacher_students").select("student_id").eq("active", true),
     supabase.from("audit_log").select("*").order("at", { ascending: false }).limit(8),
   ]);
-  const [classesToday, openPast] = await Promise.all([
+  const [classesToday, openPast, hwWaiting] = await Promise.all([
     count(
       supabase
         .from("class_sessions")
@@ -36,6 +37,7 @@ export default async function AdminDashboard() {
         .not("status", "in", "(cancelled,rescheduled)"),
     ),
     count(supabase.from("class_sessions").select("id", { count: "exact", head: true }).eq("status", "scheduled").lt("ends_at", new Date(Date.now() - 86400000).toISOString())),
+    count(supabase.from("homework_assignments").select("id", { count: "exact", head: true }).in("status", ["submitted", "under_review"])),
   ]);
 
   const { data: activeStudents } = await supabase.from("profiles").select("id").eq("role", "student").eq("status", "active");
@@ -56,6 +58,7 @@ export default async function AdminDashboard() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Classes today" value={classesToday} href={`/admin/schedules?view=day&date=${today}`} />
         <StatCard label="Past classes not closed" value={openPast} href="/admin/lessons" />
+        <StatCard label="Homework waiting for review" value={hwWaiting} href="/admin/homework?status=submitted" />
         <StatCard label="Active teachers" value={teachers} href="/admin/users?role=teacher" />
         <StatCard label="Active students" value={students} href="/admin/users?role=student" />
         <StatCard label="Students without a teacher" value={unassigned} href="/admin/users?role=student&filter=unassigned" />

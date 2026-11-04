@@ -306,3 +306,160 @@ test("material files are private to the class", async () => {
     await maria.storage.from("materials").remove([path]);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Phase 3: homework
+// ---------------------------------------------------------------------------
+const HW = { kenjiCompleted: "30000000-0000-4000-a000-000000000001", kenjiSubmitted: "30000000-0000-4000-a000-000000000002" };
+const svc = () => createClient(URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+
+async function newHomework(teacher, studentId, title, dueInMs = 86400000) {
+  const { data, error } = await teacher
+    .from("homework_assignments")
+    .insert({ teacher_id: ID.maria, student_id: studentId, title, due_at: new Date(Date.now() + dueInMs).toISOString() })
+    .select("id")
+    .single();
+  assert.equal(error, null, error?.message);
+  return data.id;
+}
+
+async function removeHomework(id) {
+  const s = svc();
+  const walk = async (prefix) => {
+    const { data } = await s.storage.from("homework").list(prefix, { limit: 100 });
+    let out = [];
+    for (const o of data ?? []) {
+      const p = `${prefix}/${o.name}`;
+      if (o.id) out.push(p);
+      else out = out.concat(await walk(p));
+    }
+    return out;
+  };
+  const files = await walk(id);
+  if (files.length) await s.storage.from("homework").remove(files);
+  await s.from("homework_assignments").delete().eq("id", id);
+}
+
+test("homework is visible only to the student, their teacher and admins", async () => {
+  const ana = await as("student2@school.test");
+  const a = await ana.from("homework_assignments").select("id");
+  assert.equal(a.data.length, 0, "Ana has no homework and sees none of Kenji's");
+  const kenji = await as("student1@school.test");
+  const k = await kenji.from("homework_assignments").select("student_id");
+  assert.ok(k.data.length >= 3 && k.data.every((r) => r.student_id === ID.kenji));
+  const james = await as("teacher2@school.test");
+  const j = await james.from("homework_assignments").select("id").eq("id", HW.kenjiCompleted);
+  assert.equal(j.data.length, 0, "another teacher can't see it");
+  const js = await james.from("homework_submissions").select("id").eq("assignment_id", HW.kenjiCompleted);
+  assert.equal(js.data.length, 0);
+});
+
+test("teacher can't assign homework to another teacher's student", async () => {
+  const maria = await as("teacher1@school.test");
+  const r = await maria.from("homework_assignments").insert({ teacher_id: ID.maria, student_id: ID.ana, title: "x", due_at: "2030-01-01T00:00:00Z" });
+  assert.ok(r.error);
+});
+
+test("students can't change status, create versions directly, or edit handed-in work", async () => {
+  const kenji = await as("student1@school.test");
+  const st = await kenji.from("homework_assignments").update({ status: "completed" }).eq("id", HW.kenjiSubmitted).select();
+  assert.equal((st.data ?? []).length, 0);
+  const ins = await kenji.from("homework_submissions").insert({ assignment_id: HW.kenjiSubmitted, version: 9, answer_text: "x" });
+  assert.ok(ins.error);
+  const ed = await kenji.from("homework_submissions").update({ answer_text: "changed" }).eq("assignment_id", HW.kenjiCompleted).select();
+  assert.equal((ed.data ?? []).length, 0, "submitted versions are frozen");
+  const sub = await kenji.rpc("submit_homework", { p_assignment: HW.kenjiSubmitted });
+  assert.ok(sub.error, "can't resubmit while waiting for review");
+});
+
+test("full homework loop: draft privacy, review visibility, revision, versions", async () => {
+  const maria = await as("teacher1@school.test");
+  const kenji = await as("student1@school.test");
+  const id = await newHomework(maria, ID.kenji, "RLS loop");
+  try {
+    const { data: d1 } = await kenji.rpc("open_homework_draft", { p_assignment: id });
+    const sv = await kenji.from("homework_submissions").update({ answer_text: "draft one" }).eq("id", d1).select();
+    assert.equal(sv.data.length, 1);
+    const peek = await maria.from("homework_submissions").select("id").eq("id", d1);
+    assert.equal(peek.data.length, 0, "teacher can't see an unsubmitted draft");
+    assert.equal((await kenji.rpc("submit_homework", { p_assignment: id })).error, null);
+    const s1 = await maria.from("homework_submissions").select("is_late, version").eq("id", d1).single();
+    assert.deepEqual(s1.data, { is_late: false, version: 1 });
+
+    await maria.rpc("start_homework_review", { p_assignment: id });
+    const ur = await maria.from("homework_assignments").select("status").eq("id", id).single();
+    assert.equal(ur.data.status, "under_review");
+    await maria.from("homework_reviews").upsert({ submission_id: d1, comments: "draft feedback" });
+    const hidden = await kenji.from("homework_reviews").select("*").eq("submission_id", d1);
+    assert.equal(hidden.data.length, 0, "unsent feedback is hidden from the student");
+    assert.equal((await maria.rpc("send_homework_review", { p_submission: d1, p_decision: "needs_revision" })).error, null);
+    const visible = await kenji.from("homework_reviews").select("comments, decision").eq("submission_id", d1);
+    assert.deepEqual(visible.data, [{ comments: "draft feedback", decision: "needs_revision" }]);
+    const locked = await maria.from("homework_reviews").update({ comments: "changed after sending" }).eq("submission_id", d1).select();
+    assert.equal((locked.data ?? []).length, 0, "sent feedback can't be edited");
+
+    const title = await maria.from("homework_assignments").update({ title: "renamed" }).eq("id", id);
+    assert.ok(title.error, "only the deadline can change after a submission");
+    const due = await maria.from("homework_assignments").update({ due_at: new Date(Date.now() + 2 * 86400000).toISOString() }).eq("id", id);
+    assert.equal(due.error, null);
+    const del = await maria.from("homework_assignments").delete().eq("id", id);
+    assert.ok(del.error, "can't withdraw submitted homework");
+
+    const { data: d2 } = await kenji.rpc("open_homework_draft", { p_assignment: id });
+    assert.notEqual(d2, d1);
+    await kenji.from("homework_submissions").update({ answer_text: "draft two" }).eq("id", d2);
+    assert.equal((await kenji.rpc("submit_homework", { p_assignment: id })).error, null);
+    const v = await kenji.from("homework_submissions").select("version").eq("assignment_id", id).order("version");
+    assert.deepEqual(v.data.map((x) => x.version), [1, 2], "both versions kept");
+    const stale = await maria.rpc("send_homework_review", { p_submission: d1, p_decision: "completed" });
+    assert.ok(stale.error, "only the latest version can be reviewed");
+    assert.equal((await maria.rpc("send_homework_review", { p_submission: d2, p_decision: "completed" })).error, null);
+    assert.ok((await kenji.rpc("open_homework_draft", { p_assignment: id })).error, "completed homework is closed");
+  } finally {
+    await removeHomework(id);
+  }
+});
+
+test("late submissions are marked late", async () => {
+  const maria = await as("teacher1@school.test");
+  const kenji = await as("student1@school.test");
+  const id = await newHomework(maria, ID.kenji, "RLS late", -3600000);
+  try {
+    const { data: d } = await kenji.rpc("open_homework_draft", { p_assignment: id });
+    await kenji.from("homework_submissions").update({ answer_text: "late answer" }).eq("id", d);
+    assert.equal((await kenji.rpc("submit_homework", { p_assignment: id })).error, null, "late work is accepted");
+    const { data } = await kenji.from("homework_submissions").select("is_late").eq("id", d).single();
+    assert.equal(data.is_late, true);
+  } finally {
+    await removeHomework(id);
+  }
+});
+
+test("homework files are private: drafts, other students and unsent corrections", async () => {
+  const kenji = await as("student1@school.test");
+  const maria = await as("teacher1@school.test");
+  const ana = await as("student2@school.test");
+  const id = await newHomework(maria, ID.kenji, "RLS files");
+  const pdf = () => new Blob(["%PDF-1.4"], { type: "application/pdf" });
+  const opts = { contentType: "application/pdf" };
+  try {
+    const { data: draft } = await kenji.rpc("open_homework_draft", { p_assignment: id });
+    const sp = `${id}/${draft}/submission/answer.pdf`;
+    assert.equal((await kenji.storage.from("homework").upload(sp, pdf(), opts)).error, null);
+    await kenji.from("homework_files").insert({ assignment_id: id, submission_id: draft, kind: "submission", storage_path: sp, file_name: "answer.pdf", uploaded_by: ID.kenji });
+    assert.ok((await maria.storage.from("homework").createSignedUrl(sp, 60)).error, "teacher can't open a draft file");
+    assert.ok((await ana.storage.from("homework").createSignedUrl(sp, 60)).error, "another student can't open it");
+    assert.ok((await ana.storage.from("homework").upload(`${id}/${draft}/submission/x.pdf`, pdf(), opts)).error, "another student can't upload");
+    await kenji.rpc("submit_homework", { p_assignment: id });
+    assert.equal((await maria.storage.from("homework").createSignedUrl(sp, 60)).error, null, "teacher can open it once submitted");
+    assert.ok((await kenji.storage.from("homework").upload(`${id}/${draft}/submission/later.pdf`, pdf(), opts)).error, "no adding files after submitting");
+
+    const cp = `${id}/${draft}/correction/marked.pdf`;
+    assert.equal((await maria.storage.from("homework").upload(cp, pdf(), opts)).error, null);
+    assert.ok((await kenji.storage.from("homework").createSignedUrl(cp, 60)).error, "correction hidden until feedback is sent");
+    await maria.rpc("send_homework_review", { p_submission: draft, p_decision: "completed" });
+    assert.equal((await kenji.storage.from("homework").createSignedUrl(cp, 60)).error, null, "correction visible after sending");
+  } finally {
+    await removeHomework(id);
+  }
+});

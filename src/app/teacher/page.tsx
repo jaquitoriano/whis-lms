@@ -5,6 +5,8 @@ import { getSessions } from "@/lib/sessions";
 import { getLessonHistory } from "@/lib/lesson-history";
 import { addDays, todayStr, zonedToUtc } from "@/lib/time";
 import { SessionList } from "@/components/class/SessionList";
+import { HomeworkTable } from "@/components/homework/HomeworkTable";
+import { listHomework } from "@/lib/homework";
 import { Avatar, ComingSoon, PageHeader, StatCard } from "@/components/ui";
 
 export const metadata = { title: "Teacher dashboard" };
@@ -19,6 +21,7 @@ export default async function TeacherDashboard() {
     getSessions(supabase, { from: zonedToUtc(addDays(today, 1), "00:00", tz), to: zonedToUtc(addDays(today, 8), "00:00", tz), teacherId: profile.id }),
     getLessonHistory(supabase, { teacherId: profile.id, limit: 50 }),
   ]);
+  const toReview = await listHomework(supabase, { teacherId: profile.id, statuses: ["submitted", "under_review"] });
   const todayActive = todays.filter((s) => s.status !== "cancelled" && s.status !== "rescheduled");
   const upcomingActive = upcoming.filter((s) => s.status === "scheduled");
   const needsNotes = history.filter(
@@ -36,11 +39,12 @@ export default async function TeacherDashboard() {
           </Link>
         }
       />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard label="Today's classes" value={todayActive.length} href={`/teacher/calendar?view=day&date=${today}`} />
         <StatCard label="Next 7 days" value={upcomingActive.length} href="/teacher/calendar" />
         <StatCard label="Assigned students" value={students.length} href="/teacher/students" />
         <StatCard label="Classes needing notes" value={needsNotes.length} href="/teacher/lessons" />
+        <StatCard label="Homework to review" value={toReview.length} href="/teacher/homework" />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -82,7 +86,10 @@ export default async function TeacherDashboard() {
             </ul>
           )}
         </section>
-        <ComingSoon phase={3}>Homework waiting for your review will appear here.</ComingSoon>
+        <section className="lg:col-span-2">
+          <h2 className="mb-2 font-semibold">Homework to review</h2>
+          <HomeworkTable rows={toReview.slice(0, 6)} viewer="teacher" tz={tz} empty="Nothing waiting for review." />
+        </section>
         <ComingSoon phase={4}>School announcements will appear here.</ComingSoon>
       </div>
     </>

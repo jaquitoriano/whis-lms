@@ -5,6 +5,8 @@ import { getSessions } from "@/lib/sessions";
 import { getLessonHistory } from "@/lib/lesson-history";
 import { formatDateTime, minutesBetween, tzLabel } from "@/lib/time";
 import { SessionList } from "@/components/class/SessionList";
+import { HomeworkTable } from "@/components/homework/HomeworkTable";
+import { listHomework } from "@/lib/homework";
 import { Avatar, ComingSoon, PageHeader } from "@/components/ui";
 
 export const metadata = { title: "Student dashboard" };
@@ -19,6 +21,7 @@ export default async function StudentDashboard() {
     getSessions(supabase, { from: new Date(now.getTime() - 60 * 60000), to: new Date(now.getTime() + 60 * 86400000), studentId: profile.id }),
     getLessonHistory(supabase, { studentId: profile.id, limit: 10 }),
   ]);
+  const openHomework = await listHomework(supabase, { studentId: profile.id, statuses: ["assigned", "needs_revision"] });
   const teacher = teachers[0];
   const scheduled = upcoming.filter((s) => s.status === "scheduled" && Date.parse(s.ends_at) > now.getTime());
   const next = scheduled[0];
@@ -92,7 +95,10 @@ export default async function StudentDashboard() {
           )}
         </section>
 
-        <ComingSoon phase={3}>Upcoming homework will appear here.</ComingSoon>
+        <section className="lg:col-span-2">
+          <h2 className="mb-2 font-semibold">Homework to do</h2>
+          <HomeworkTable rows={openHomework.slice(0, 6)} viewer="student" tz={tz} empty="No homework right now." />
+        </section>
         <ComingSoon phase={4}>School announcements will appear here.</ComingSoon>
       </div>
     </>

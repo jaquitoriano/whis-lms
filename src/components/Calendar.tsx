@@ -20,6 +20,7 @@ import type { Role } from "@/lib/types";
 export type CalendarView = "month" | "week" | "day";
 export type Availability = { weekday: number; start_time: string; end_time: string };
 export type Blackout = { id: string; starts_at: string; ends_at: string; reason: string };
+export type Deadline = { id: string; title: string; due_at: string; href: string; done: boolean };
 
 export function parseCalendarParams(sp: { view?: string; date?: string }, tz: string) {
   const view: CalendarView = sp.view === "month" || sp.view === "day" ? sp.view : "week";
@@ -84,6 +85,7 @@ export function Calendar({
   availability,
   blackouts,
   newHref,
+  deadlines,
 }: {
   sessions: SessionRow[];
   view: CalendarView;
@@ -95,6 +97,7 @@ export function Calendar({
   availability?: Availability[];
   blackouts?: Blackout[];
   newHref?: (day: DateStr) => string;
+  deadlines?: Deadline[];
 }) {
   const { days } = calendarRange(view, date, tz);
   const today = todayStr(tz);
@@ -107,6 +110,16 @@ export function Calendar({
     const q = new URLSearchParams({ ...Object.fromEntries(Object.entries(query).filter(([, x]) => x)), view: v, date: d } as Record<string, string>);
     return `${basePath}?${q}`;
   };
+  const dueBy = new Map<string, Deadline[]>();
+  for (const dl of deadlines ?? []) {
+    const k = toDateStr(new Date(dl.due_at), tz);
+    dueBy.set(k, [...(dueBy.get(k) ?? []), dl]);
+  }
+  const DueChip = ({ dl }: { dl: Deadline }) => (
+    <Link href={dl.href} className={`block truncate rounded-md border border-dashed px-2 py-1 text-xs ${dl.done ? "border-slate-200 text-slate-400" : "border-amber-300 bg-amber-50/50 text-amber-800"}`} title={`Homework due: ${dl.title}`}>
+      Due {formatTime(dl.due_at, tz)} · {dl.title}
+    </Link>
+  );
   const avFor = (d: DateStr) => (availability ?? []).filter((a) => a.weekday === weekdayOf(d));
   const blFor = (d: DateStr) =>
     (blackouts ?? []).filter((b) => toDateStr(new Date(b.starts_at), tz) <= d && d <= toDateStr(new Date(Date.parse(b.ends_at) - 1), tz));
@@ -165,6 +178,9 @@ export function Calendar({
                     {Number(d.slice(8))}
                   </Link>
                   <div className="space-y-1">
+                    {(dueBy.get(d) ?? []).slice(0, 1).map((dl) => (
+                      <DueChip key={dl.id} dl={dl} />
+                    ))}
                     {items.slice(0, 3).map((s) => (
                       <Chip key={s.id} s={s} viewer={viewer} tz={tz} compact />
                     ))}
@@ -212,6 +228,9 @@ export function Calendar({
                 )}
                 <div className="space-y-1.5">
                   {items.length === 0 && view === "day" && <p className="text-sm text-muted">No classes.</p>}
+                  {(dueBy.get(d) ?? []).map((dl) => (
+                    <DueChip key={dl.id} dl={dl} />
+                  ))}
                   {items.map((s) => (
                     <Chip key={s.id} s={s} viewer={viewer} tz={tz} />
                   ))}
