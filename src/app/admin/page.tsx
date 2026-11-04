@@ -12,6 +12,7 @@ const actionLabel: Record<string, string> = {
   "assignment.delete": "Assignment removed",
   "session.status": "Class status changed",
   "homework.status": "Homework status changed",
+  "policy.publish": "Class policies published",
 };
 
 export default async function AdminDashboard() {
@@ -27,7 +28,8 @@ export default async function AdminDashboard() {
     supabase.from("teacher_students").select("student_id").eq("active", true),
     supabase.from("audit_log").select("*").order("at", { ascending: false }).limit(8),
   ]);
-  const [classesToday, openPast, hwWaiting] = await Promise.all([
+  const { data: latestPolicy } = await supabase.from("policies").select("version").order("version", { ascending: false }).limit(1).maybeSingle();
+  const [classesToday, openPast, hwWaiting, policyAccepted] = await Promise.all([
     count(
       supabase
         .from("class_sessions")
@@ -38,6 +40,7 @@ export default async function AdminDashboard() {
     ),
     count(supabase.from("class_sessions").select("id", { count: "exact", head: true }).eq("status", "scheduled").lt("ends_at", new Date(Date.now() - 86400000).toISOString())),
     count(supabase.from("homework_assignments").select("id", { count: "exact", head: true }).in("status", ["submitted", "under_review"])),
+    latestPolicy ? count(supabase.from("policy_acceptances").select("user_id", { count: "exact", head: true }).eq("version", latestPolicy.version)) : Promise.resolve(0),
   ]);
 
   const { data: activeStudents } = await supabase.from("profiles").select("id").eq("role", "student").eq("status", "active");
@@ -64,10 +67,16 @@ export default async function AdminDashboard() {
         <StatCard label="Students without a teacher" value={unassigned} href="/admin/users?role=student&filter=unassigned" />
         <StatCard label="Accounts on hold" value={onHold} href="/admin/users?status=on_hold" />
         <StatCard label="New inquiries" value={newInquiries} href="/admin/inquiries" />
+        <StatCard label="Students yet to accept policies" value={latestPolicy ? Math.max(0, students - policyAccepted) : "—"} href="/admin/policies" />
       </div>
 
       <section className="card mt-6">
-        <h2 className="font-semibold">Recent changes</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Recent changes</h2>
+          <Link href="/admin/audit" className="text-sm text-brand-700 hover:underline">
+            Full audit log
+          </Link>
+        </div>
         {(audit.data ?? []).length === 0 ? (
           <p className="mt-2 text-sm text-muted">No changes recorded yet.</p>
         ) : (

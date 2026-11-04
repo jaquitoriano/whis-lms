@@ -7,11 +7,13 @@ import { formatDateTime, minutesBetween, tzLabel } from "@/lib/time";
 import { SessionList } from "@/components/class/SessionList";
 import { HomeworkTable } from "@/components/homework/HomeworkTable";
 import { listHomework } from "@/lib/homework";
-import { Avatar, ComingSoon, PageHeader } from "@/components/ui";
+import { AnnouncementsPanel } from "@/components/portal/Announcements";
+import { Avatar, PageHeader } from "@/components/ui";
 
 export const metadata = { title: "Student dashboard" };
 
-export default async function StudentDashboard() {
+export default async function StudentDashboard({ searchParams }: { searchParams: Promise<{ policies?: string }> }) {
+  const { policies } = await searchParams;
   const { supabase, profile } = await requireRole("student");
   const tz = profile.timezone;
   const now = new Date();
@@ -33,6 +35,7 @@ export default async function StudentDashboard() {
         title={`Welcome, ${profile.full_name.split(" ")[0]}`}
         description={enrollment?.course ? `${enrollment.course.name}${enrollment.class_level ? ` · Level ${enrollment.class_level}` : ""}` : undefined}
       />
+      {policies === "accepted" && <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">Thank you. You have accepted the class policies.</p>}
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <section className="card border-brand-100">
           <h2 className="mb-2 font-semibold">Next class</h2>
@@ -99,7 +102,7 @@ export default async function StudentDashboard() {
           <h2 className="mb-2 font-semibold">Homework to do</h2>
           <HomeworkTable rows={openHomework.slice(0, 6)} viewer="student" tz={tz} empty="No homework right now." />
         </section>
-        <ComingSoon phase={4}>School announcements will appear here.</ComingSoon>
+        <AnnouncementsPanel supabase={supabase} role="student" tz={tz} />
       </div>
     </>
   );

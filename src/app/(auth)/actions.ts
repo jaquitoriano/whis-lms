@@ -35,7 +35,7 @@ export async function signOut() {
 
 export async function requestPasswordReset(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const email = String(formData.get("email") ?? "").trim();
-  const origin = (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const origin = (await headers()).get("origin") ?? process.env.NEXT_SITE_URL ?? "http://localhost:3000";
   const supabase = await createClient();
   await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${origin}/auth/confirm?next=/reset-password` });
   // Same answer whether or not the email exists, so accounts can't be discovered.

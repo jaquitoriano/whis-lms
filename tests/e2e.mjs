@@ -10,7 +10,7 @@ import { join } from "node:path";
 const TMP_PDF = join(tmpdir(), "lms-e2e.pdf");
 const APP = process.cwd();
 const env = Object.fromEntries(readFileSync(APP + "/.env.local","utf8").split(/\r?\n/).filter(Boolean).map(l=>l.split(/=(.*)/s).slice(0,2)));
-const svc = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+const svc = createClient(env.NEXT_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 const B = "http://localhost:3000";
 const results = []; const ok = (name, cond, extra="") => { results.push([cond, name]); console.log(cond ? "PASS" : "FAIL", name, cond ? "" : extra); };
 const d = new Date(Date.now() + 5*86400000); const date = new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(d);

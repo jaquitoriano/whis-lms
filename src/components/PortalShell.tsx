@@ -3,6 +3,7 @@ import { site } from "@/config/site";
 import { signOut } from "@/app/(auth)/actions";
 import { Avatar } from "@/components/ui";
 import { NavLink } from "@/components/NavLink";
+import { NotificationBell } from "@/components/portal/NotificationBell";
 import type { Profile } from "@/lib/types";
 
 export type NavItem = { href: string; label: string; phase?: number };
@@ -51,6 +52,7 @@ export function PortalShell({
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-end gap-3 border-b border-border bg-surface px-4 py-3">
+          <NotificationBell role={profile.role} />
           <Avatar profile={profile} size={32} />
           <span className="hidden text-sm font-medium sm:inline">{profile.full_name}</span>
           <form action={signOut}>

@@ -163,3 +163,23 @@ insert into public.homework_files (assignment_id, kind, title, url, uploaded_by)
   ('30000000-0000-4000-a000-000000000003', 'reference', 'Environment vocabulary list', 'https://dictionary.cambridge.org/', '00000000-0000-4000-a000-000000000011');
 
 select set_config('app.homework_workflow', 'off', false);
+
+-- ---------------------------------------------------------------------------
+-- Phase 4 sample data: class policies v1 (Min-jun hasn't accepted yet), an announcement.
+-- ---------------------------------------------------------------------------
+insert into public.policies (version, title, summary, body, published_by) values (1, 'Class policies',
+  'Attendance, lateness, cancellations, payments and homework.',
+E'## Attendance\nPlease join every class on time using the link in your calendar. If you miss a class without notice it counts as attended.\n\n## Late arrival\nIf you are more than 15 minutes late, the class may be shortened or counted as a no-show. Classes still end at the scheduled time.\n\n## Cancelling or rescheduling\n- Give at least **24 hours'' notice** to cancel or move a class.\n- Late cancellations count as a used class.\n- If your teacher cancels, the class is rescheduled at no cost.\n\n## Payment\nPackages are paid in advance and are valid for the period stated in your contract.\n\n## Class duration\nStandard classes are 50 minutes.\n\n## Homework\nHomework is set after most classes. Please submit it before the deadline so your teacher can give feedback before the next class.\n\n## Other guidelines\nUse a quiet place with a stable internet connection, and keep your camera on during speaking practice.',
+'00000000-0000-4000-a000-000000000001');
+
+insert into public.policy_acceptances (version, user_id, accepted_at) values
+  (1, '00000000-0000-4000-a000-000000000021', now() - interval '20 days'),
+  (1, '00000000-0000-4000-a000-000000000022', now() - interval '10 days');
+
+insert into public.announcements (id, title, body, audience, publish_at, notified_at, created_by) values
+  ('40000000-0000-4000-a000-000000000001', 'Holiday schedule',
+   E'The school office is closed on **30 November** and **25 December**. Classes on those days will be rescheduled by your teacher.',
+   'everyone', now() - interval '1 day', now() - interval '1 day', '00000000-0000-4000-a000-000000000001');
+
+-- Seeded data shouldn't email everyone on first run.
+update public.notifications set email_status = 'skipped';

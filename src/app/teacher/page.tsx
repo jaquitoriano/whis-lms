@@ -7,7 +7,8 @@ import { addDays, todayStr, zonedToUtc } from "@/lib/time";
 import { SessionList } from "@/components/class/SessionList";
 import { HomeworkTable } from "@/components/homework/HomeworkTable";
 import { listHomework } from "@/lib/homework";
-import { Avatar, ComingSoon, PageHeader, StatCard } from "@/components/ui";
+import { AnnouncementsPanel } from "@/components/portal/Announcements";
+import { Avatar, PageHeader, StatCard } from "@/components/ui";
 
 export const metadata = { title: "Teacher dashboard" };
 
@@ -90,7 +91,7 @@ export default async function TeacherDashboard() {
           <h2 className="mb-2 font-semibold">Homework to review</h2>
           <HomeworkTable rows={toReview.slice(0, 6)} viewer="teacher" tz={tz} empty="Nothing waiting for review." />
         </section>
-        <ComingSoon phase={4}>School announcements will appear here.</ComingSoon>
+        <AnnouncementsPanel supabase={supabase} role="teacher" tz={tz} />
       </div>
     </>
   );
