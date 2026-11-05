@@ -30,7 +30,7 @@ export async function signIn(_prev: ActionState, formData: FormData): Promise<Ac
 
 export async function signOut() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" }); // This device only; other devices stay signed in.
   redirect("/login");
 }
 
