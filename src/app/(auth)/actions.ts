@@ -17,6 +17,7 @@ export async function signIn(_prev: ActionState, formData: FormData): Promise<Ac
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) console.error("signIn failed:", error.status, error.message);
   if (error || !data.user) return { error: "Incorrect email or password." };
 
   const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", data.user.id).single<{ role: Role; status: string }>();
