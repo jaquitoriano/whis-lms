@@ -1,7 +1,7 @@
 # Online English & IELTS LMS
 
 Learning management system for a one-to-one online English and IELTS school, with admin, teacher and student portals.
-Stack: Next.js 15 (App Router, TypeScript, Tailwind) and Supabase (Postgres with row-level security, Auth, Storage).
+Stack: Next.js 16 (App Router, TypeScript, Tailwind) and Supabase (Postgres with row-level security, Auth, Storage).
 
 ## Status
 
@@ -12,6 +12,7 @@ Stack: Next.js 15 (App Router, TypeScript, Tailwind) and Supabase (Postgres with
 | 2 | Calendars (day/week/month), scheduling with double-booking prevention, teacher availability and blocked dates, class pages, three-part lesson records with autosave, materials (files and links), YouTube videos, reschedule and cancel | Done |
 | 3 | Homework: assign from a class or on its own, reference files, student drafts with autosave, file and photo uploads, submit, teacher review with corrections and corrected files, revision loop with every version kept, admin monitoring | Done |
 | 4 | Notifications (bell, notification centre, email, per-type email settings), scheduled reminders, announcements, versioned class policies with student acceptance, settings and password change, audit log | Done. **First launch (MVP) complete** |
+| 4.5 | Phone layouts and menu, upload progress and upload fix, fewer background requests, faster queries, long lists split into pages, homework counts no longer hidden by old work | Done |
 | 5 | Contracts and e-signing, attendance, payments and billing | Next |
 | 6–7 | Progress and IELTS reports, messaging, recordings, advanced reports | Planned (shown as "coming soon" in the portals) |
 
@@ -28,6 +29,8 @@ Stack: Next.js 15 (App Router, TypeScript, Tailwind) and Supabase (Postgres with
 6. Run the app: `npm run dev`, then open http://localhost:3000
 
 Local extras: Supabase Studio (database browser) at http://127.0.0.1:54323, and every email the app sends (password resets, notifications) lands in Mailpit at http://127.0.0.1:54324.
+
+**If `db:start` or `db:reset` fails with "ports are not available":** Windows sometimes reserves the 54xxx ports after Docker starts. Check with `netsh interface ipv4 show excludedportrange protocol=tcp`, and clear it from an admin PowerShell with `net stop winnat; net start winnat`.
 
 ### Notifications and email
 
@@ -85,6 +88,8 @@ Run it after every database change.
 
 Run `npm run db:reset` first if you have changed data by hand: the tests expect the seed data.
 
+**The tests only run against a local database.** They read `.env.local` and refuse to start if it points anywhere else. If your `.env.local` points to a hosted project, keep the local settings in another file and name it for the tests and the app: `$env:ENV_FILE=".env.test"` for the tests (PowerShell), plus the same values as process variables for `npm run dev`, which take priority over `.env.local`.
+
 ## Decisions made for Phase 2 (change if needed)
 
 - Teachers can schedule, edit, cancel and reschedule their own classes with their assigned students. Admins can turn off adding and rescheduling for teachers in Website settings. Students view only and contact the school to change a class.
@@ -106,6 +111,15 @@ Run `npm run db:reset` first if you have changed data by hand: the tests expect 
 - Admins can see all homework but not change it.
 - Not yet built (Phase 4): notifications for new homework, submissions, deadlines and feedback. Guardians will not receive homework emails.
 - Inline highlighting inside a student's answer (a "Should" story) is not built. Teachers write corrections in the Corrections box or upload a marked-up file.
+
+## Decisions made for Phase 4.5 (change if needed)
+
+- Portal links load only when tapped. Next.js's background loading of visible links caused dozens of extra server calls per page. Use `@/components/Link` in the portals, and `next/link` on the public site.
+- The portals have no `loading.tsx`, on purpose: it would make refused pages return 200 instead of a real 404. A progress bar shows on tap instead.
+- The middleware only reads the session cookie. The real login check is `requireRole()` in each portal's layout, so every new portal must use it. `npm run test:smoke` checks that a forged cookie is refused.
+- Open homework and completed homework are loaded separately. Never load them as one list ordered by deadline: old completed work pushes out recent work and makes counts wrong.
+- YouTube's player loads when play is pressed. Before that, the page shows a thumbnail from YouTube.
+- Lists show 50 rows a page. Lesson history keeps the latest 300 classes, and completed homework the latest 200.
 
 ## Decisions made for Phase 4 (change if needed)
 

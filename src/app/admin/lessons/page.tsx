@@ -1,16 +1,17 @@
 import { requireRole } from "@/lib/auth";
 import { LessonList } from "@/components/class/LessonList";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, Pager, paginate } from "@/components/ui";
 import { getLessonHistory } from "@/lib/lesson-history";
 
 export const metadata = { title: "Lesson records" };
 
-export default async function AdminLessonsPage({ searchParams }: { searchParams: Promise<{ missing?: string }> }) {
+export default async function AdminLessonsPage({ searchParams }: { searchParams: Promise<{ missing?: string; page?: string }> }) {
   const { supabase, profile } = await requireRole("admin");
-  const { missing } = await searchParams;
+  const { missing, page } = await searchParams;
   let rows = await getLessonHistory(supabase, { limit: 300 });
   const missingCount = rows.filter((r) => r.status === "completed" && !(r.lesson?.feedback_overall || r.lesson?.today_topics)).length;
   if (missing) rows = rows.filter((r) => r.status === "completed" && !(r.lesson?.feedback_overall || r.lesson?.today_topics));
+  const list = paginate(rows, page);
   return (
     <>
       <PageHeader
@@ -22,7 +23,8 @@ export default async function AdminLessonsPage({ searchParams }: { searchParams:
           </a>
         }
       />
-      <LessonList rows={rows} viewer="admin" tz={profile.timezone} empty="No past classes yet." />
+      <LessonList rows={list.rows} viewer="admin" tz={profile.timezone} empty="No past classes yet." />
+      <Pager {...list} base="/admin/lessons" params={{ missing }} />
     </>
   );
 }

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ActionForm } from "@/components/ActionForm";
 import { PageHeader } from "@/components/ui";

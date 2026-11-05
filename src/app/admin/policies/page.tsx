@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { requireRole } from "@/lib/auth";
 import { ActionForm } from "@/components/ActionForm";
 import { FORMAT_HINT, RichText } from "@/components/RichText";

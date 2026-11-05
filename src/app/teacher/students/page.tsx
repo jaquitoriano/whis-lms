@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { requireRole } from "@/lib/auth";
 import { getMyStudents } from "@/lib/teacher-data";
 import { Avatar, EmptyState, PageHeader, StatusBadge, formatDate } from "@/components/ui";

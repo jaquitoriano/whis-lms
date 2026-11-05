@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RichText } from "@/components/RichText";
 import { EmptyState, PageHeader } from "@/components/ui";

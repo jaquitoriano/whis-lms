@@ -8,7 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 
 function loadEnv() {
   try {
-    for (const line of readFileSync(".env.local", "utf8").split(/\r?\n/)) {
+    for (const line of readFileSync(process.env.ENV_FILE ?? ".env.local", "utf8").split(/\r?\n/)) {
       const m = line.match(/^([A-Z_]+)=(.*)$/);
       if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
     }

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { EmptyState } from "@/components/ui";
 import { formatDateTime } from "@/lib/time";
 import { isOverdue, statusLabel, statusStyle, type Homework } from "@/lib/homework-shared";
@@ -35,10 +35,10 @@ export function HomeworkTable({
         <thead className="border-b border-border text-xs uppercase text-muted">
           <tr>
             <th className="px-4 py-3 font-medium">Homework</th>
-            {viewer !== "student" && <th className="px-4 py-3 font-medium">Student</th>}
-            {viewer !== "teacher" && <th className="px-4 py-3 font-medium">Teacher</th>}
-            <th className="px-4 py-3 font-medium">Due</th>
-            <th className="px-4 py-3 font-medium">Status</th>
+            {viewer !== "student" && <th className="hidden px-4 py-3 font-medium sm:table-cell">Student</th>}
+            {viewer !== "teacher" && <th className="hidden px-4 py-3 font-medium sm:table-cell">Teacher</th>}
+            <th className="hidden px-4 py-3 font-medium sm:table-cell">Due</th>
+            <th className="hidden px-4 py-3 font-medium sm:table-cell">Status</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -51,11 +51,21 @@ export function HomeworkTable({
                   <Link href={`/${viewer}/homework/${h.id}`} className="font-medium hover:text-brand-700">
                     {h.title}
                   </Link>
+                  {/* On phones the other columns are hidden and their details sit under the title. */}
+                  <div className="mt-1 space-y-1 text-xs text-muted sm:hidden">
+                    {viewer !== "student" && <p>{h.student?.full_name}</p>}
+                    {viewer !== "teacher" && <p>{h.teacher?.full_name}</p>}
+                    <p>Due {formatDateTime(h.due_at, tz)}</p>
+                    <p>
+                      <HomeworkStatusBadges h={h} now={now} />
+                      {waitingLong && <span className="badge ml-1 bg-amber-50 text-amber-700">Waiting &gt; 48 h</span>}
+                    </p>
+                  </div>
                 </td>
-                {viewer !== "student" && <td className="px-4 py-3">{h.student?.full_name}</td>}
-                {viewer !== "teacher" && <td className="px-4 py-3">{h.teacher?.full_name}</td>}
-                <td className="whitespace-nowrap px-4 py-3 text-muted">{formatDateTime(h.due_at, tz)}</td>
-                <td className="px-4 py-3">
+                {viewer !== "student" && <td className="hidden px-4 py-3 sm:table-cell">{h.student?.full_name}</td>}
+                {viewer !== "teacher" && <td className="hidden px-4 py-3 sm:table-cell">{h.teacher?.full_name}</td>}
+                <td className="hidden whitespace-nowrap px-4 py-3 text-muted sm:table-cell">{formatDateTime(h.due_at, tz)}</td>
+                <td className="hidden px-4 py-3 sm:table-cell">
                   <HomeworkStatusBadges h={h} now={now} />
                   {waitingLong && <span className="badge ml-1 bg-amber-50 text-amber-700">Waiting &gt; 48 h</span>}
                 </td>

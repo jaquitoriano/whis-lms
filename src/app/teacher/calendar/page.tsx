@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { requireRole } from "@/lib/auth";
 import { Calendar, calendarRange, parseCalendarParams, type Availability, type Blackout } from "@/components/Calendar";
 import { PageHeader } from "@/components/ui";

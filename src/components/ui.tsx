@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { AccountStatus, Profile } from "@/lib/types";
 
 export function PageHeader({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
@@ -66,13 +66,65 @@ export function EmptyState({ children }: { children: React.ReactNode }) {
   return <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted">{children}</div>;
 }
 
-export function ComingSoon({ phase, children }: { phase: number; children: React.ReactNode }) {
+export function ComingSoon({ children }: { phase: number; children: React.ReactNode }) {
   return (
     <div className="card border-dashed">
       <p className="text-sm text-muted">
-        {children} <span className="badge ml-1 bg-slate-100 text-slate-600">Phase {phase}</span>
+        {children} <span className="badge ml-1 bg-slate-100 text-slate-600">Coming soon</span>
       </p>
     </div>
+  );
+}
+
+// Long lists are shown a page at a time, so nobody downloads hundreds of rows to read the first few.
+export const PER_PAGE = 50;
+
+export function paginate<T>(rows: T[], page: string | undefined, perPage = PER_PAGE) {
+  const pages = Math.max(1, Math.ceil(rows.length / perPage));
+  const current = Math.min(pages, Math.max(1, Math.floor(Number(page)) || 1));
+  return { rows: rows.slice((current - 1) * perPage, current * perPage), current, pages, total: rows.length, perPage };
+}
+
+export function Pager({
+  current,
+  pages,
+  total,
+  perPage,
+  base,
+  params = {},
+}: {
+  current: number;
+  pages: number;
+  total: number;
+  perPage: number;
+  base: string;
+  params?: Record<string, string | undefined>;
+}) {
+  if (pages <= 1) return null;
+  const href = (page: number) => {
+    const q = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => !!e[1]));
+    if (page > 1) q.set("page", String(page));
+    const s = q.toString();
+    return s ? `${base}?${s}` : base;
+  };
+  return (
+    <nav className="mt-4 flex items-center justify-between gap-3 text-sm" aria-label="Pages">
+      <span className="text-muted">
+        {(current - 1) * perPage + 1}–{Math.min(current * perPage, total)} of {total}
+      </span>
+      <span className="flex gap-2">
+        {current > 1 && (
+          <Link href={href(current - 1)} className="btn-secondary">
+            Previous
+          </Link>
+        )}
+        {current < pages && (
+          <Link href={href(current + 1)} className="btn-secondary">
+            Next
+          </Link>
+        )}
+      </span>
+    </nav>
   );
 }
 

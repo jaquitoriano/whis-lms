@@ -9,7 +9,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 const TMP_PDF = join(tmpdir(), "lms-e2e.pdf");
 const APP = process.cwd();
-const env = Object.fromEntries(readFileSync(APP + "/.env.local","utf8").split(/\r?\n/).filter(Boolean).map(l=>l.split(/=(.*)/s).slice(0,2)));
+const env = Object.fromEntries(readFileSync(process.env.ENV_FILE ?? APP + "/.env.local","utf8").split(/\r?\n/).filter(Boolean).map(l=>l.split(/=(.*)/s).slice(0,2)));
+if (!/127.0.0.1|localhost/.test(env.NEXT_SUPABASE_URL)) throw new Error("E2E tests run against the local database only");
 const svc = createClient(env.NEXT_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 const B = "http://localhost:3000";
 const results = []; const ok = (name, cond, extra="") => { results.push([cond, name]); console.log(cond ? "PASS" : "FAIL", name, cond ? "" : extra); };
@@ -60,7 +61,9 @@ try {
   // 7. add a YouTube video
   await page.fill("input[name=url][placeholder='YouTube link']", "https://youtu.be/aqz-KE-bpKQ?t=10"); await page.fill("input[name=title][placeholder=Title] >> nth=-1", "E2E video");
   await page.click("button:has-text('Add video')"); await page.waitForSelector("text=E2E video", { timeout: 10000 });
-  ok("YouTube link is embedded", (await page.locator("iframe[src*='aqz-KE-bpKQ']").count()) >= 1);
+  ok("YouTube player waits until play is pressed", (await page.locator("iframe[src*='aqz-KE-bpKQ']").count()) === 0);
+  await page.click("button[aria-label='Play video: E2E video']");
+  ok("pressing play embeds the YouTube video", (await page.locator("iframe[src*='aqz-KE-bpKQ']").count()) >= 1);
   // 8. complete the class
   await page.click("button:has-text('Mark completed')"); await page.waitForSelector("text=Reopen as scheduled", { state: "detached", timeout: 3000 }).catch(()=>{});
   await page.waitForFunction(() => /Completed/.test(document.querySelector(".badge.border")?.textContent ?? ""), null, { timeout: 10000 });

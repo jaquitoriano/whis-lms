@@ -1,6 +1,6 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { requireRole } from "@/lib/auth";
-import { EmptyState, PageHeader } from "@/components/ui";
+import { EmptyState, PageHeader, Pager, paginate } from "@/components/ui";
 import { formatDateTime } from "@/lib/time";
 
 export const metadata = { title: "Audit log" };
@@ -42,13 +42,14 @@ function change(before: Record<string, unknown> | null, after: Record<string, un
 }
 
 // NFR-27: who changed what, and when.
-export default async function AuditPage({ searchParams }: { searchParams: Promise<{ group?: string }> }) {
+export default async function AuditPage({ searchParams }: { searchParams: Promise<{ group?: string; page?: string }> }) {
   const { supabase, profile } = await requireRole("admin");
-  const { group = "" } = await searchParams;
+  const { group = "", page } = await searchParams;
   let q = supabase.from("audit_log").select("*").order("at", { ascending: false }).limit(300);
   if (groups.some((g) => g.key === group) && group) q = q.like("action", `${group}.%`);
   const { data } = await q;
-  const rows = data ?? [];
+  const list = paginate(data ?? [], page);
+  const rows = list.rows;
   const actorIds = [...new Set(rows.map((r) => r.actor_id).filter(Boolean))];
   const { data: actors } = actorIds.length ? await supabase.from("profiles").select("id, full_name").in("id", actorIds) : { data: [] };
   const name = new Map((actors ?? []).map((a) => [a.id, a.full_name]));
@@ -92,6 +93,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
           </table>
         </div>
       )}
+      <Pager {...list} base="/admin/audit" params={{ group }} />
     </>
   );
 }

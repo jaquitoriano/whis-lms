@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { ActionForm } from "@/components/ActionForm";

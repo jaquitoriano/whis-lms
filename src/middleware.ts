@@ -3,8 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PORTALS = ["/admin", "/teacher", "/student", "/dashboard"];
 
-// Refreshes the Supabase session cookie on every request and sends logged-out
-// visitors away from the portals. Role checks happen in each portal's layout.
+// Refreshes the Supabase session cookie on every request and sends logged-out visitors away from
+// the portals. This only reads the cookie, without a network call, so it is a convenience and not
+// a security check: requireRole() in each portal's layout verifies the user with the auth server.
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -26,11 +27,11 @@ export async function middleware(request: NextRequest) {
   );
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
   const path = request.nextUrl.pathname;
-  if (!user && PORTALS.some((p) => path === p || path.startsWith(p + "/"))) {
+  if (!session && PORTALS.some((p) => path === p || path.startsWith(p + "/"))) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", path);

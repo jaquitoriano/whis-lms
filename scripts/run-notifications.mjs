@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 
 const env = Object.fromEntries(
-  readFileSync(".env.local", "utf8")
+  readFileSync(process.env.ENV_FILE ?? ".env.local", "utf8")
     .split(/\r?\n/)
     .filter((l) => l && !l.startsWith("#"))
     .map((l) => l.split(/=(.*)/s).slice(0, 2)),

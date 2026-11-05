@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const env = Object.fromEntries(
-  readFileSync(".env.local", "utf8")
+  readFileSync(process.env.ENV_FILE ?? ".env.local", "utf8")
     .split(/\r?\n/)
     .filter(Boolean)
     .map((l) => l.split(/=(.*)/s).slice(0, 2)),

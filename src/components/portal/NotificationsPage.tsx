@@ -9,9 +9,10 @@ type Row = { id: string; type: string; title: string; body: string; created_at: 
 
 // Notification centre (NOT-20): newest first; opening one marks it read and follows its link.
 export async function NotificationsPage({ supabase, viewer }: { supabase: SupabaseClient; viewer: Profile }) {
-  const { data } = await supabase.from("notifications").select("id, type, title, body, created_at, read_at").order("created_at", { ascending: false }).limit(100);
+  const { data } = await supabase.from("notifications").select("id, type, title, body, created_at, read_at").order("created_at", { ascending: false }).limit(50);
   const rows = (data ?? []) as Row[];
-  const unread = rows.filter((r) => !r.read_at).length;
+  const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null);
+  const unread = count ?? 0;
   return (
     <>
       <PageHeader

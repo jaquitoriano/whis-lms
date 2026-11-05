@@ -9,7 +9,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 const env = Object.fromEntries(
-  readFileSync(".env.local", "utf8")
+  readFileSync(process.env.ENV_FILE ?? ".env.local", "utf8")
     .split(/\r?\n/)
     .filter((l) => l && !l.startsWith("#"))
     .map((l) => l.split(/=(.*)/s).slice(0, 2)),
@@ -17,7 +17,7 @@ const env = Object.fromEntries(
 if (!/127\.0\.0\.1|localhost/.test(env.NEXT_SUPABASE_URL)) throw new Error("E2E tests run against the local database only");
 const svc = createClient(env.NEXT_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 const B = process.env.BASE_URL ?? "http://localhost:3000";
-const MAILPIT = "http://127.0.0.1:54324";
+const MAILPIT = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
 const MINJUN = "00000000-0000-4000-a000-000000000023";
 const KENJI = "00000000-0000-4000-a000-000000000021";
 const stamp = Date.now().toString(36);

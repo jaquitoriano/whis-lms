@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { requireRole } from "@/lib/auth";
 import { getMyEnrollment, getMyTeachers } from "@/lib/student-data";
 import { getSessions } from "@/lib/sessions";
@@ -17,13 +17,13 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
   const { supabase, profile } = await requireRole("student");
   const tz = profile.timezone;
   const now = new Date();
-  const [teachers, enrollment, upcoming, history] = await Promise.all([
+  const [teachers, enrollment, upcoming, history, openHomework] = await Promise.all([
     getMyTeachers(supabase, profile.id),
     getMyEnrollment(supabase, profile.id),
     getSessions(supabase, { from: new Date(now.getTime() - 60 * 60000), to: new Date(now.getTime() + 60 * 86400000), studentId: profile.id }),
     getLessonHistory(supabase, { studentId: profile.id, limit: 10 }),
+    listHomework(supabase, { studentId: profile.id, statuses: ["assigned", "needs_revision"] }),
   ]);
-  const openHomework = await listHomework(supabase, { studentId: profile.id, statuses: ["assigned", "needs_revision"] });
   const teacher = teachers[0];
   const scheduled = upcoming.filter((s) => s.status === "scheduled" && Date.parse(s.ends_at) > now.getTime());
   const next = scheduled[0];
@@ -36,7 +36,7 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
         description={enrollment?.course ? `${enrollment.course.name}${enrollment.class_level ? ` · Level ${enrollment.class_level}` : ""}` : undefined}
       />
       {policies === "accepted" && <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">Thank you. You have accepted the class policies.</p>}
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
         <section className="card border-brand-100">
           <h2 className="mb-2 font-semibold">Next class</h2>
           {next ? (

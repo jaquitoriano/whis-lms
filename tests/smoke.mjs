@@ -6,7 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 
 const env = Object.fromEntries(
-  readFileSync(".env.local", "utf8")
+  readFileSync(process.env.ENV_FILE ?? ".env.local", "utf8")
     .split(/\r?\n/)
     .filter(Boolean)
     .map((l) => l.split(/=(.*)/s).slice(0, 2)),
@@ -53,7 +53,7 @@ const mustHave = [
   ["teacher1@school.test", "/teacher/calendar?view=week", ["Asia/Manila", "09:00–18:00", "Kenji Tanaka"]],
   ["teacher1@school.test", "/teacher/calendar?view=month", ["Kenji Tanaka"]],
   ["teacher1@school.test", "/teacher/calendar/new", ["Schedule a class", "Kenji Tanaka", "Repeat weekly"]],
-  ["teacher1@school.test", `/teacher/classes/${S3}`, ["Mark completed", "Cambridge IELTS 18", "youtube-nocookie.com/embed/", "1. Previous lesson", "Visible to student", "Private notes", "Asia/Tokyo"]],
+  ["teacher1@school.test", `/teacher/classes/${S3}`, ["Mark completed", "Cambridge IELTS 18", "i.ytimg.com/vi/", "1. Previous lesson", "Visible to student", "Private notes", "Asia/Tokyo"]],
   ["teacher1@school.test", "/teacher/availability", ["Weekly teaching hours", "Training day"]],
   ["teacher1@school.test", "/teacher/lessons", ["Lesson records", "Kenji Tanaka"]],
   ["teacher1@school.test", `/teacher/students/${KENJI}`, ["Lesson history", "Upcoming classes"]],
@@ -141,6 +141,17 @@ for (const [u, p, bad, label] of mustNotHave) {
   const ok = r.status === 200 && !found.length;
   if (!ok) fail++;
   console.log(ok ? "PASS" : "FAIL", label, ok ? "" : `status=${r.status} found=${JSON.stringify(found)}`);
+}
+// The middleware no longer calls the auth server, so the portal layouts must reject a forged session.
+{
+  const forged = "base64-" + Buffer.from(JSON.stringify({ access_token: "forged.token.value", refresh_token: "forged", expires_at: 4102444800, token_type: "bearer", user: { id: KENJI, role: "authenticated" } })).toString("base64url");
+  const ref = new URL(env.NEXT_SUPABASE_URL).hostname.split(".")[0];
+  for (const p of ["/student", "/teacher", "/admin", `/student/classes/${S3}`]) {
+    const r = await get(`sb-${ref}-auth-token=${forged}`, p);
+    const ok = r.status === 307 && /\/login/.test(r.loc ?? "") && !r.body;
+    if (!ok) fail++;
+    console.log(ok ? "PASS" : "FAIL", "forged session cookie refused on", p, ok ? "" : `status=${r.status} ${r.loc ?? ""}`);
+  }
 }
 console.log(fail ? `${fail} failed` : "all passed");
 process.exit(fail ? 1 : 0);
