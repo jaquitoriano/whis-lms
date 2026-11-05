@@ -1,10 +1,10 @@
 import "server-only";
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 import { site } from "@/config/site";
 
 // Transactional email over SMTP (NOT-21). Locally this goes to Mailpit
 // (http://127.0.0.1:54324); in production set SMTP_* for your provider (e.g. Resend).
-let transport: nodemailer.Transporter | null = null;
+let transport: Transporter | null = null;
 
 function getTransport() {
   if (transport) return transport;
