@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/auth";
 import { ActionForm } from "@/components/ActionForm";
 import { Avatar, PageHeader, StatusBadge, formatDate } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
+import { StudentPackages } from "@/components/billing/StudentPackages";
 import {
   addGuardian,
   assignTeacher,
@@ -294,6 +295,8 @@ async function StudentSection({ id }: { id: string }) {
           <input className="input" name="phone" placeholder="Phone" aria-label="Guardian phone" />
         </ActionForm>
       </section>
+
+      <StudentPackages supabase={supabase} studentId={id} />
     </>
   );
 }

@@ -17,13 +17,17 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
   const { supabase, profile } = await requireRole("student");
   const tz = profile.timezone;
   const now = new Date();
-  const [teachers, enrollment, upcoming, history, openHomework] = await Promise.all([
+  const [teachers, enrollment, upcoming, history, openHomework, { data: toSign }, { data: openInvoices }] = await Promise.all([
     getMyTeachers(supabase, profile.id),
     getMyEnrollment(supabase, profile.id),
     getSessions(supabase, { from: new Date(now.getTime() - 60 * 60000), to: new Date(now.getTime() + 60 * 86400000), studentId: profile.id }),
     getLessonHistory(supabase, { studentId: profile.id, limit: 10 }),
     listHomework(supabase, { studentId: profile.id, statuses: ["assigned", "needs_revision"] }),
+    supabase.from("contracts").select("id, title, signer_kind, signer_name").eq("status", "sent").limit(1),
+    supabase.from("invoices").select("id, due_date").in("status", ["unpaid", "partially_paid"]),
   ]);
+  const contractToSign = (toSign ?? []).find((c) => c.signer_kind === "self");
+  const overdueCount = (openInvoices ?? []).filter((i) => i.due_date < now.toISOString().slice(0, 10)).length;
   const teacher = teachers[0];
   const scheduled = upcoming.filter((s) => s.status === "scheduled" && Date.parse(s.ends_at) > now.getTime());
   const next = scheduled[0];
@@ -35,6 +39,16 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
         title={`Welcome, ${profile.full_name.split(" ")[0]}`}
         description={enrollment?.course ? `${enrollment.course.name}${enrollment.class_level ? ` · Level ${enrollment.class_level}` : ""}` : undefined}
       />
+      {contractToSign && (
+        <Link href="/student/contract" className="mb-4 block rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 hover:bg-amber-100">
+          <strong>Please sign your enrollment agreement.</strong> {contractToSign.title} is ready for you to read and sign →
+        </Link>
+      )}
+      {overdueCount > 0 && (
+        <Link href="/student/billing" className="mb-4 block rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 hover:bg-red-100">
+          You have {overdueCount} overdue invoice{overdueCount > 1 ? "s" : ""}. See Classes and payments →
+        </Link>
+      )}
       {policies === "accepted" && <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">Thank you. You have accepted the class policies.</p>}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
         <section className="card border-brand-100">

@@ -7,6 +7,8 @@ import { LessonRecordEditor } from "./LessonRecordEditor";
 import { MaterialUploader } from "./MaterialUploader";
 import { YouTubePlayer } from "./YouTubePlayer";
 import { StatusPanel } from "./StatusPanel";
+import { AttendancePanel } from "./AttendancePanel";
+import { getBillingSettings } from "@/lib/billing";
 import { getSession, statusLabel, statusStyle, classPath } from "@/lib/sessions";
 import { LESSON_SECTIONS, type LessonRecord } from "@/lib/lesson-fields";
 import { formatDateTime, minutesBetween, toDateStr, toTimeStr, tzLabel } from "@/lib/time";
@@ -44,13 +46,19 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
   const tz = viewer.timezone;
 
   await (canManage ? supabase.rpc("ensure_lesson_record", { p_session: id }) : Promise.resolve());
-  const [{ data: materials }, { data: videos }, { data: record }, { data: priv }, { data: next }, homework] = await Promise.all([
+  const isAdmin = viewer.role === "admin";
+  const [{ data: materials }, { data: videos }, { data: record }, { data: priv }, { data: next }, homework, { data: attendance }, settings, { data: enrollments }] = await Promise.all([
     supabase.from("materials").select("*").eq("session_id", id).order("created_at"),
     supabase.from("videos").select("*").eq("session_id", id).order("created_at"),
     supabase.from("lesson_records").select("*").eq("session_id", id).maybeSingle(),
     canManage ? supabase.from("lesson_private_notes").select("notes").eq("session_id", id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from("class_sessions").select("id").eq("rescheduled_from_id", id).maybeSingle(),
     listHomework(supabase, { sessionId: id }),
+    supabase.from("attendance").select("mark, minutes_late, note").eq("session_id", id).maybeSingle(),
+    getBillingSettings(supabase),
+    isAdmin
+      ? supabase.from("enrollments").select("id, package_name, starts_on, status").eq("student_id", s.student_id).order("starts_on", { ascending: false })
+      : Promise.resolve({ data: null }),
   ]);
   const isOwnerTeacher = viewer.role === "teacher" && s.teacher_id === viewer.id;
   const mats = (materials ?? []) as Material[];
@@ -153,6 +161,8 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
               defaultDate={toDateStr(new Date(s.starts_at), tz)}
               defaultTime={toTimeStr(new Date(s.starts_at), tz)}
               tzLabel={tzLabel(tz)}
+              lateCancelHours={settings.late_cancel_hours}
+              startsAt={s.starts_at}
             />
             {active && (
               <ActionForm action={updateMeetingLink.bind(null, id)} submitLabel="Save link" className="flex flex-wrap items-start gap-2">
@@ -169,6 +179,21 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
           </div>
         )}
       </section>
+
+      <AttendancePanel
+        sessionId={id}
+        status={s.status}
+        attendance={attendance}
+        canEdit={canManage}
+        isAdmin={isAdmin}
+        billing={{
+          counts_as_used: s.counts_as_used,
+          late_cancel: s.late_cancel,
+          cancel_requested_by: s.cancel_requested_by,
+          enrollment_id: s.enrollment_id,
+          enrollments: (enrollments ?? []).map((e) => ({ id: e.id, label: `${e.package_name} (from ${e.starts_on}${e.status !== "active" ? `, ${e.status}` : ""})` })),
+        }}
+      />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="card">

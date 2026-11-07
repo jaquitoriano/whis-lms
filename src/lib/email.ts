@@ -46,3 +46,35 @@ export async function sendNotificationEmail(to: string, n: { title: string; body
 </body></html>`,
   });
 }
+
+export function emailConfigured() {
+  return !!process.env.SMTP_HOST;
+}
+
+// One-off emails to people who may not have an account (a guardian signing a contract), with
+// optional PDF attachments. Sent straight away rather than through the notification queue,
+// because there is no notification row for someone without an account.
+export async function sendDirectEmail(opts: {
+  to: string;
+  subject: string;
+  lines: string[];
+  link?: { url: string; label: string };
+  attachments?: { filename: string; content: Uint8Array }[];
+}) {
+  const t = getTransport();
+  if (!t) throw new Error("SMTP is not configured");
+  const textBody = [...opts.lines, ...(opts.link ? [`${opts.link.label}: ${opts.link.url}`] : []), `— ${site.name}`].join("\n\n");
+  await t.sendMail({
+    from: process.env.EMAIL_FROM ?? `${site.name} <no-reply@localhost>`,
+    to: opts.to,
+    subject: opts.subject,
+    text: textBody,
+    html: `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#0f172a;max-width:560px;margin:0 auto;padding:24px">
+<p style="font-size:13px;color:#64748b;margin:0 0 16px">${esc(site.name)}</p>
+<h1 style="font-size:18px;margin:0 0 12px">${esc(opts.subject)}</h1>
+${opts.lines.map((l) => `<p style="font-size:15px;line-height:1.5;margin:0 0 12px">${esc(l)}</p>`).join("\n")}
+${opts.link ? `<p style="margin-top:20px"><a href="${esc(opts.link.url)}" style="display:inline-block;background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-size:14px">${esc(opts.link.label)}</a></p>` : ""}
+</body></html>`,
+    attachments: (opts.attachments ?? []).map((a) => ({ filename: a.filename, content: Buffer.from(a.content), contentType: "application/pdf" })),
+  });
+}

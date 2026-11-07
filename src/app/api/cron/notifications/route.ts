@@ -3,7 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNotificationEmail } from "@/lib/email";
 
 // Scheduled job (every ~15 minutes): creates time-based notifications (class reminders,
-// homework due soon, review backlog, scheduled announcements), then emails everything
+// homework due soon, review backlog, scheduled announcements, payment reminders, monthly
+// statements, contract expiry), then emails everything
 // pending. Call with:  Authorization: Bearer <CRON_SECRET>
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,9 @@ async function run(request: NextRequest) {
 
   const gen = await db.rpc("generate_scheduled_notifications");
   if (gen.error) return NextResponse.json({ error: gen.error.message }, { status: 500 });
+  // Phase 5: payment reminders (NOT-16), monthly statements ready, contract expiry.
+  const bill = await db.rpc("generate_billing_notifications");
+  if (bill.error) return NextResponse.json({ error: bill.error.message }, { status: 500 });
 
   const { data: pending, error } = await db
     .from("notifications")
@@ -51,7 +55,7 @@ async function run(request: NextRequest) {
         .eq("id", n.id);
     }
   }
-  return NextResponse.json({ generated: gen.data, sent, failed, more: (pending ?? []).length === BATCH });
+  return NextResponse.json({ generated: gen.data, billing: bill.data, sent, failed, more: (pending ?? []).length === BATCH });
 }
 
 export const GET = run;

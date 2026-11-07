@@ -12,8 +12,9 @@ const nav: NavItem[] = [
   { href: "/student/homework", label: "Homework" },
   { href: "/student/announcements", label: "Announcements" },
   { href: "/student/policies", label: "Class Policies" },
+  { href: "/student/contract", label: "My Contract" },
+  { href: "/student/billing", label: "Classes and Payments" },
   { href: "/student/settings", label: "Settings" },
-  { href: "/student/contract", label: "My Contract", phase: 5 },
   { href: "/student/progress", label: "My Progress", phase: 6 },
   { href: "/student/messages", label: "Messages", phase: 6 },
 ];

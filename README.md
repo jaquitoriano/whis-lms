@@ -13,8 +13,9 @@ Stack: Next.js 16 (App Router, TypeScript, Tailwind) and Supabase (Postgres with
 | 3 | Homework: assign from a class or on its own, reference files, student drafts with autosave, file and photo uploads, submit, teacher review with corrections and corrected files, revision loop with every version kept, admin monitoring | Done |
 | 4 | Notifications (bell, notification centre, email, per-type email settings), scheduled reminders, announcements, versioned class policies with student acceptance, settings and password change, audit log | Done. **First launch (MVP) complete** |
 | 4.5 | Phone layouts and menu, upload progress and upload fix, fewer background requests, faster queries, long lists split into pages, homework counts no longer hidden by old work | Done |
-| 5 | Contracts and e-signing, attendance, payments and billing | Next |
-| 6–7 | Progress and IELTS reports, messaging, recordings, advanced reports | Planned (shown as "coming soon" in the portals) |
+| 5 | Class packages, attendance, enrollment contracts with e-signing (student in the portal, guardian by email link), invoices, payments, receipts, monthly statements, PDFs, teacher pay | Done |
+| 6 | Progress and IELTS reports, messaging | Next |
+| 7 | Recordings, Zoom/Meet connection, advanced reports | Planned (shown as "coming soon" in the portals) |
 
 ## First-time setup (Windows)
 
@@ -80,15 +81,32 @@ Run it after every database change.
 
 | Command | What it checks | Needs |
 |---|---|---|
-| `npm run test:rls` | 33 database privacy rules (who can see and change what, double-booking, private files, homework workflow, notifications, announcements, policies) | local database |
+| `npm run test:rls` | 46 database rules: privacy (who can see and change what), double-booking, private files, homework workflow, notifications, announcements, policies, and Phase 5 (billing privacy, invoice totals and balances, no overpaying, void instead of delete, package usage, attendance, contract signing, teacher pay) | local database |
 | `npm run test:smoke` | Every portal page renders the right content for each role, and other people's pages are refused | local database + `npm run dev` |
 | `npm run test:e2e` | Real browser walk-through: schedule, autosave notes, upload, YouTube, complete, student view, reschedule | local database + `npm run dev`; first run `npx playwright install chromium` |
 | `npm run test:e2e:homework` | Real browser walk-through of homework: assign, draft, photo upload, submit, review, revision, version 2, complete | same as above |
+| `npm run test:e2e:phase5` | Invoice → part payment → PDFs (invoice, receipt, statement), student's classes and payments page, student signs a contract, guardian signs from the emailed link, teacher marks late and records a late cancellation, access checks, phone layout | local database + running app (`npm run dev`); safe to repeat |
 | `npm run test:e2e:phase4` | Announcement → bell → notification centre, email delivered to Mailpit, email settings, policy gate and acceptance, publishing a new policy version | same as above (also needs Docker for cleanup) |
 
 Run `npm run db:reset` first if you have changed data by hand: the tests expect the seed data.
 
 **The tests only run against a local database.** They read `.env.local` and refuse to start if it points anywhere else. If your `.env.local` points to a hosted project, keep the local settings in another file and name it for the tests and the app: `$env:ENV_FILE=".env.test"` for the tests (PowerShell), plus the same values as process variables for `npm run dev`, which take priority over `.env.local`.
+
+## Decisions made for Phase 5 (Nov 2026, change if needed)
+
+- **Payments are recorded by the admin** (bank transfer, GCash, Maya, cash, card, PayPal). There is no online checkout (open decision OD-03). The tables are ready for one to be added later.
+- **Which classes use up a class from the package** (OD-04): completed classes and student no-shows always do. A cancellation the student asked for less than 24 hours before the class also does (the cutoff is in Payments and billing → Billing settings). Teacher absences, reschedules, and cancellations by the teacher or school don't. When cancelling, the teacher picks who asked. An admin can override any single class on its page, and the override is logged.
+- **Packages**: an admin adds a package to a student (Students → the student → Packages, payments and contract), optionally sending its invoice at the same time. New classes join the student's current package automatically, and a rescheduled class stays in its package. Teachers see how many classes their student has left, never prices.
+- **Attendance** follows the class status (completed = Present, student absent = Absent, cancelled, rescheduled). The teacher can change Present to Late with the minutes. A teacher absence has no mark.
+- **Invoices and payments are never deleted**, only voided with a reason. Totals, amounts paid and statuses (Unpaid, Partially paid, Paid) are worked out by the database from the lines and payments, so they can't be typed in. A payment can't be more than the balance, and an invoice's lines can't change after a payment. Invoice, receipt and contract numbers (INV-2026-00001, OR-2026-00001, CT-2026-0001) are given by the database, in order.
+- **Statements** are built from the records each time, for any month: opening balance, invoices, payments, closing balance and the classes held. Students get a notification when last month's statement is ready.
+- **Reminders** (NOT-16): 3 days before an invoice is due, then once a week while it is overdue. Admins get one daily summary of overdue invoices, and a notification when a contract is signed. These are the only notifications admins get, so admins now have a bell and can switch the emails off in My account.
+- **Contracts**: made from a versioned template (a saved version never changes) and filled in from the student's package. They can be edited only as drafts. When sent, the text is frozen and its SHA-256 fingerprint stored. Signing records the typed name, consent, time, IP address and browser, checks the fingerprint again, and emails the signer a PDF copy. To change a sent or signed contract, void it and make a new one.
+- **Minors**: the parent or guardian signs through a one-time email link (valid 14 days, no account needed). Only a fingerprint of the link is stored. The admin can send a new link, which stops the old one. If email isn't set up, the admin is shown the link to share by hand.
+- **The starter contract template is a placeholder.** Have a lawyer review it before using it with real students, especially for minors.
+- **Teacher pay** (admin only): a rate per teacher, per class or per hour. Monthly payouts count every class that used up a student's class. Payouts go Draft → Approved → Paid. An adjustment can be added while it's a draft, and a paid payout can't be changed.
+- **PDFs** use the standard Helvetica font, so names in Korean, Japanese or other non-Latin scripts print as "?". Fixing that means embedding a Unicode font.
+- One currency for the school (PHP by default, in Billing settings). Months and document dates follow the school time zone (Asia/Manila).
 
 ## Decisions made for Phase 2 (change if needed)
 

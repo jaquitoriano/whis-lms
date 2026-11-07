@@ -50,7 +50,7 @@ export default async function CoursesPage() {
   const courses = (data ?? []) as Course[];
   return (
     <>
-      <PageHeader title="Courses" description="Tuition rates and class packages come in Phase 5." />
+      <PageHeader title="Courses" description="Tuition rates and class packages are under Payments and billing → Class packages." />
       <div className="space-y-4">
         {courses.map((c) => (
           <details key={c.id} className="card group">

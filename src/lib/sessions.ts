@@ -15,6 +15,10 @@ export type SessionRow = {
   meeting_url: string | null;
   rescheduled_from_id: string | null;
   status_reason: string | null;
+  enrollment_id: string | null;
+  counts_as_used: boolean;
+  late_cancel: boolean;
+  cancel_requested_by: "student" | "teacher" | "school" | null;
   teacher: { id: string; full_name: string; timezone: string } | null;
   student: { id: string; full_name: string; timezone: string } | null;
   course: { name: string; type: string } | null;

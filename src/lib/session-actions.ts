@@ -13,7 +13,8 @@ const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 function dbError(e: { code?: string; message?: string } | null): string {
   if (!e) return "Something went wrong.";
   if (e.code === "23P01") return "That time overlaps another class for this teacher or student.";
-  if (e.code === "P0001" || e.message?.includes("not assigned")) return "This student is not assigned to this teacher.";
+  if (e.message?.includes("not assigned")) return "This student is not assigned to this teacher.";
+  if (e.code === "P0001" && e.message) return e.message;
   if (e.code === "42501" || e.message?.includes("row-level security")) return "You don't have permission to do that.";
   return e.message ?? "Something went wrong.";
 }
@@ -113,10 +114,20 @@ export async function setClassStatus(sessionId: string, _prev: ActionState, form
   const allowed = profile.role === "admin" ? ADMIN_STATUSES : profile.role === "teacher" ? TEACHER_STATUSES : [];
   if (!allowed.includes(status)) return { error: "You can't set that status." };
   if (status === "cancelled" && !reason) return { error: "Please give a reason for cancelling." };
+  // OD-04: who asked decides whether a late cancellation uses up a class (worked out in the database).
+  const requestedBy = str(formData, "requested_by");
+  if (status === "cancelled" && !["student", "teacher", "school"].includes(requestedBy)) return { error: "Choose who asked to cancel." };
+  const minutesLate = Number(formData.get("minutes_late") ?? 0);
+  const late = status === "completed" && formData.get("attendance") === "late";
+  if (late && (!Number.isInteger(minutesLate) || minutesLate < 1 || minutesLate > 240)) return { error: "Enter how many minutes late (1–240)." };
 
-  const { error, data } = await supabase.from("class_sessions").update({ status, status_reason: reason }).eq("id", sessionId).select("id");
+  const patch: Record<string, unknown> = { status, status_reason: reason };
+  if (status === "cancelled") patch.cancel_requested_by = requestedBy;
+  const { error, data } = await supabase.from("class_sessions").update(patch).eq("id", sessionId).select("id");
   if (error) return { error: dbError(error) };
   if (!data?.length) return { error: "You don't have permission to change this class." };
+  // ATT-02: the status sets a default mark (completed = present); a late arrival replaces it.
+  if (late) await supabase.from("attendance").update({ mark: "late", minutes_late: minutesLate }).eq("session_id", sessionId);
 
   // Completing a class shares its lesson record with the student.
   if (status === "completed") {
@@ -125,6 +136,45 @@ export async function setClassStatus(sessionId: string, _prev: ActionState, form
   }
   refresh(sessionId);
   return { ok: true, message: "Class updated." };
+}
+
+// ATT-02: correct the attendance mark after the class (Present <-> Late, with a note).
+export async function saveAttendance(sessionId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+  const { supabase, profile } = await auth();
+  if (profile.role === "student") return { error: "Not allowed." };
+  const mark = str(formData, "mark");
+  const minutes = Number(formData.get("minutes_late") ?? 0);
+  const { data: cur } = await supabase.from("attendance").select("mark").eq("session_id", sessionId).maybeSingle();
+  if (!cur) return { error: "Attendance is recorded when the class is closed." };
+  // Absent, cancelled and rescheduled follow the class status; only completed classes have a choice.
+  const patch: Record<string, unknown> = { note: str(formData, "note").slice(0, 1000) };
+  if (mark === "present" || mark === "late") {
+    if (cur.mark !== "present" && cur.mark !== "late") return { error: "Change the class status to change this mark." };
+    if (mark === "late" && (!Number.isInteger(minutes) || minutes < 1 || minutes > 240)) return { error: "Enter how many minutes late (1–240)." };
+    patch.mark = mark;
+    patch.minutes_late = mark === "late" ? minutes : null;
+  }
+  const { error, data } = await supabase.from("attendance").update(patch).eq("session_id", sessionId).select("session_id");
+  if (error) return { error: dbError(error) };
+  if (!data?.length) return { error: "You don't have permission to change this attendance." };
+  refresh(sessionId);
+  return { ok: true, message: "Attendance saved." };
+}
+
+// Admin only: which package a class belongs to, and whether it used up a class (OD-04 override).
+export async function setSessionBilling(sessionId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+  const { supabase, profile } = await auth();
+  if (profile.role !== "admin") return { error: "Only an administrator can change this." };
+  const { error, data } = await supabase
+    .from("class_sessions")
+    .update({ enrollment_id: str(formData, "enrollment_id") || null, counts_as_used: formData.get("counts_as_used") === "on" })
+    .eq("id", sessionId)
+    .select("id");
+  if (error) return { error: dbError(error) };
+  if (!data?.length) return { error: "Class not found." };
+  refresh(sessionId);
+  revalidatePath("/admin/billing", "layout");
+  return { ok: true, message: "Package details saved." };
 }
 
 export async function rescheduleClass(sessionId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {

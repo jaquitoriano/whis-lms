@@ -36,7 +36,6 @@ export async function markAllRead() {
 // ---------------------------------------------------------------------------
 export async function saveEmailPreferences(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const { supabase, profile } = await auth();
-  if (profile.role === "admin") return { error: "Admins don't receive these notifications." };
   const rows = NOTIFICATION_TYPES[profile.role].map((t) => ({ user_id: profile.id, type: t.type, email: formData.get(`email_${t.type}`) === "on" }));
   const { error } = await supabase.from("notification_preferences").upsert(rows);
   if (error) return { error: "Could not save your preferences." };

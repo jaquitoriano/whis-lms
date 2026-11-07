@@ -9,14 +9,16 @@ const nav: NavItem[] = [
   { href: "/admin/schedules", label: "Class schedules" },
   { href: "/admin/lessons", label: "Lesson records" },
   { href: "/admin/homework", label: "Homework monitoring" },
+  { href: "/admin/attendance", label: "Attendance" },
+  { href: "/admin/billing", label: "Payments and billing" },
+  { href: "/admin/contracts", label: "Contracts" },
   { href: "/admin/announcements", label: "Announcements" },
   { href: "/admin/policies", label: "Class policies" },
   { href: "/admin/inquiries", label: "Inquiries" },
   { href: "/admin/audit", label: "Audit log" },
   { href: "/admin/settings", label: "Website settings" },
+  { href: "/admin/notifications", label: "Notifications" },
   { href: "/admin/account", label: "My account" },
-  { href: "/admin/attendance", label: "Attendance", phase: 5 },
-  { href: "/admin/billing", label: "Payments and billing", phase: 5 },
   { href: "/admin/reports", label: "Reports", phase: 7 },
 ];
 

@@ -88,6 +88,21 @@ insert into public.teacher_blackouts (teacher_id, starts_at, ends_at, reason) va
    ((date_trunc('day', now() at time zone 'Asia/Manila') + interval '11 days') at time zone 'Asia/Manila'),
    'Training day');
 
+-- Phase 5: class packages and each student's current package. Inserted before the classes,
+-- so the classes attach to them automatically.
+insert into public.class_packages (id, course_id, name, classes_count, class_minutes, price, currency, validity_days, description, sort_order) values
+  ('30000000-0000-4000-a000-000000000001', '10000000-0000-4000-a000-000000000002', 'IELTS 20 classes', 20, 50, 12000, 'PHP', 120, 'Two classes a week for about ten weeks.', 1),
+  ('30000000-0000-4000-a000-000000000002', '10000000-0000-4000-a000-000000000001', 'General English 10 classes', 10, 50, 5000, 'PHP', 90, 'Flexible schedule.', 2),
+  ('30000000-0000-4000-a000-000000000003', '10000000-0000-4000-a000-000000000003', 'Business English 12 classes', 12, 50, 7800, 'PHP', 90, 'Three months, one class a week.', 3);
+
+insert into public.enrollments (id, student_id, course_id, package_id, package_name, classes_total, class_minutes, classes_per_week, price, currency, starts_on, ends_on, created_by) values
+  ('31000000-0000-4000-a000-000000000001', '00000000-0000-4000-a000-000000000021', '10000000-0000-4000-a000-000000000002', '30000000-0000-4000-a000-000000000001',
+   'IELTS 20 classes', 20, 50, 2, 12000, 'PHP', current_date - 30, current_date + 90, '00000000-0000-4000-a000-000000000001'),
+  ('31000000-0000-4000-a000-000000000002', '00000000-0000-4000-a000-000000000022', '10000000-0000-4000-a000-000000000003', '30000000-0000-4000-a000-000000000003',
+   'Business English 12 classes', 12, 50, 1, 7800, 'PHP', current_date - 20, current_date + 70, '00000000-0000-4000-a000-000000000001'),
+  ('31000000-0000-4000-a000-000000000003', '00000000-0000-4000-a000-000000000023', '10000000-0000-4000-a000-000000000001', '30000000-0000-4000-a000-000000000002',
+   'General English 10 classes', 10, 50, 2, 5000, 'PHP', current_date - 20, current_date + 70, '00000000-0000-4000-a000-000000000001');
+
 with base as (select date_trunc('day', now() at time zone 'Asia/Manila') as d),
 s(id, teacher, student, course, day_offset, hh, status) as (values
   ('20000000-0000-4000-a000-000000000001'::uuid, '00000000-0000-4000-a000-000000000011'::uuid, '00000000-0000-4000-a000-000000000021'::uuid, '10000000-0000-4000-a000-000000000002'::uuid, -7, 10, 'completed'),
@@ -183,3 +198,50 @@ insert into public.announcements (id, title, body, audience, publish_at, notifie
 
 -- Seeded data shouldn't email everyone on first run.
 update public.notifications set email_status = 'skipped';
+
+-- ---------------------------------------------------------------------------
+-- Phase 5: contracts, invoices, payments, teacher rates
+-- ---------------------------------------------------------------------------
+insert into public.teacher_rates (teacher_id, basis, rate, currency) values
+  ('00000000-0000-4000-a000-000000000011', 'per_class', 450, 'PHP'),
+  ('00000000-0000-4000-a000-000000000012', 'per_hour', 500, 'PHP');
+
+-- Kenji: waiting for his signature. Ana: signed. Min-jun (minor): sent to his mother.
+insert into public.contracts (id, student_id, enrollment_id, template_version, title, body, tuition, currency, payment_terms,
+  valid_from, valid_to, signer_kind, guardian_id, signer_name, signer_email, created_by)
+select v.id, v.student, v.enrollment, 1, 'Enrollment agreement: ' || v.pkg,
+       '## 1. Parties' || E'\n' || 'This agreement is between Bright Path English ("the School") and ' || v.student_name || ' ("the Student"). It is signed by ' || v.signer || '.' || E'\n\n' ||
+       '## 2. Course and schedule' || E'\n' || '- Package: ' || v.pkg || E'\n' || '- Tuition: PHP ' || to_char(v.price, 'FM999,990.00') || E'\n\n' ||
+       '## 3. Attendance and cancellation' || E'\n' || '- A class the Student cancels less than 24 hours before it starts counts as a used class.',
+       v.price, 'PHP', 'Full payment within 7 days of the invoice date.', current_date - 30, current_date + 90,
+       v.kind::public.signer_kind, v.guardian, v.signer, v.email, '00000000-0000-4000-a000-000000000001'
+from (values
+  ('40000000-0000-4000-a000-000000000001'::uuid, '00000000-0000-4000-a000-000000000021'::uuid, '31000000-0000-4000-a000-000000000001'::uuid,
+   'IELTS 20 classes', 'Kenji Tanaka', 'Kenji Tanaka', 12000::numeric, 'self', null::uuid, 'student1@school.test'),
+  ('40000000-0000-4000-a000-000000000002'::uuid, '00000000-0000-4000-a000-000000000022'::uuid, '31000000-0000-4000-a000-000000000002'::uuid,
+   'Business English 12 classes', 'Ana Reyes', 'Ana Reyes', 7800::numeric, 'self', null::uuid, 'student2@school.test'),
+  ('40000000-0000-4000-a000-000000000003'::uuid, '00000000-0000-4000-a000-000000000023'::uuid, '31000000-0000-4000-a000-000000000003'::uuid,
+   'General English 10 classes', 'Min-jun Park', 'Ji-woo Park', 5000::numeric, 'guardian',
+   (select id from public.guardians where student_id = '00000000-0000-4000-a000-000000000023' limit 1), 'jiwoo.park@example.com')
+) as v(id, student, enrollment, pkg, student_name, signer, price, kind, guardian, email);
+
+update public.contracts set status = 'sent';
+insert into public.contract_signatures (contract_id, signer_name, signer_relationship, signed_by_user, consent, signed_at, ip, user_agent, document_hash)
+select id, 'Ana Reyes', 'self', student_id, true, now() - interval '19 days', '127.0.0.1', 'seed', document_hash
+from public.contracts where id = '40000000-0000-4000-a000-000000000002';
+update public.contracts set status = 'signed' where id = '40000000-0000-4000-a000-000000000002';
+
+-- Kenji: part paid and overdue. Ana: paid in full with a discount. Min-jun: due in two days.
+insert into public.invoices (id, student_id, enrollment_id, issue_date, due_date, currency, notes, created_by) values
+  ('50000000-0000-4000-a000-000000000001', '00000000-0000-4000-a000-000000000021', '31000000-0000-4000-a000-000000000001', current_date - 30, current_date - 23, 'PHP', '', '00000000-0000-4000-a000-000000000001'),
+  ('50000000-0000-4000-a000-000000000002', '00000000-0000-4000-a000-000000000022', '31000000-0000-4000-a000-000000000002', current_date - 20, current_date - 13, 'PHP', 'Early sign-up discount applied.', '00000000-0000-4000-a000-000000000001'),
+  ('50000000-0000-4000-a000-000000000003', '00000000-0000-4000-a000-000000000023', '31000000-0000-4000-a000-000000000003', current_date - 5, current_date + 2, 'PHP', '', '00000000-0000-4000-a000-000000000001');
+insert into public.invoice_items (invoice_id, position, description, quantity, unit_price) values
+  ('50000000-0000-4000-a000-000000000001', 0, 'IELTS 20 classes (50 min)', 1, 12000),
+  ('50000000-0000-4000-a000-000000000002', 0, 'Business English 12 classes (50 min)', 1, 7800),
+  ('50000000-0000-4000-a000-000000000002', 1, 'Early sign-up discount', 1, -300),
+  ('50000000-0000-4000-a000-000000000003', 0, 'General English 10 classes (50 min)', 1, 5000);
+insert into public.payments (invoice_id, student_id, amount, method, reference, paid_on, recorded_by) values
+  ('50000000-0000-4000-a000-000000000001', '00000000-0000-4000-a000-000000000021', 6000, 'bank_transfer', 'BDO 88231', current_date - 28, '00000000-0000-4000-a000-000000000001'),
+  ('50000000-0000-4000-a000-000000000002', '00000000-0000-4000-a000-000000000022', 7500, 'gcash', 'GC 1093-2281', current_date - 19, '00000000-0000-4000-a000-000000000001');
+

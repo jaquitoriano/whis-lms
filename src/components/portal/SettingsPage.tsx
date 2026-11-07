@@ -8,7 +8,7 @@ import { tzLabel } from "@/lib/time";
 import type { Profile } from "@/lib/types";
 
 export async function SettingsPage({ supabase, viewer }: { supabase: SupabaseClient; viewer: Profile }) {
-  const types = viewer.role === "admin" ? [] : NOTIFICATION_TYPES[viewer.role];
+  const types = NOTIFICATION_TYPES[viewer.role];
   const { data } = await supabase.from("notification_preferences").select("type, email");
   const off = new Set((data ?? []).filter((p) => !p.email).map((p) => p.type));
 
