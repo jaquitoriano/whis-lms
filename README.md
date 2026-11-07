@@ -1,7 +1,7 @@
 # Online English & IELTS LMS
 
 Learning management system for a one-to-one online English and IELTS school, with admin, teacher and student portals.
-Stack: Next.js 15 (App Router, TypeScript, Tailwind) and Supabase (Postgres with row-level security, Auth, Storage).
+Stack: Next.js 16 (App Router, TypeScript, Tailwind) and Supabase (Postgres with row-level security, Auth, Storage).
 
 ## Status
 
@@ -11,8 +11,10 @@ Stack: Next.js 15 (App Router, TypeScript, Tailwind) and Supabase (Postgres with
 | 1 | Public site, teacher/student profiles, basic admin (users, assignments, courses, inquiries, settings) | Done |
 | 2 | Calendars (day/week/month), scheduling with double-booking prevention, teacher availability and blocked dates, class pages, three-part lesson records with autosave, materials (files and links), YouTube videos, reschedule and cancel | Done |
 | 3 | Homework: assign from a class or on its own, reference files, student drafts with autosave, file and photo uploads, submit, teacher review with corrections and corrected files, revision loop with every version kept, admin monitoring | Done |
-| 4 | Admin dashboard extras, announcements, notifications (in-app + email), class policies | Next |
-| 5–7 | Contracts/billing, progress, extras | Planned (shown as "coming soon" in the portals) |
+| 4 | Notifications (bell, notification centre, email, per-type email settings), scheduled reminders, announcements, versioned class policies with student acceptance, settings and password change, audit log | Done. **First launch (MVP) complete** |
+| 4.5 | Phone layouts and menu, upload progress and upload fix, fewer background requests, faster queries, long lists split into pages, homework counts no longer hidden by old work | Done |
+| 5 | Contracts and e-signing, attendance, payments and billing | Next |
+| 6–7 | Progress and IELTS reports, messaging, recordings, advanced reports | Planned (shown as "coming soon" in the portals) |
 
 ## First-time setup (Windows)
 
@@ -20,13 +22,22 @@ Stack: Next.js 15 (App Router, TypeScript, Tailwind) and Supabase (Postgres with
 2. Install packages: `npm install`
 3. Start the local database: `npm run db:start` (the first run downloads images, ~5 min).
 4. Copy `.env.example` to `.env.local` and fill in the values that `npx supabase status` prints:
-   - `API URL` → `NEXT_PUBLIC_SUPABASE_URL`
-   - `anon key` (or Publishable key) → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `API URL` → `NEXT_SUPABASE_URL`
+   - `anon key` (or Publishable key) → `NEXT_SUPABASE_ANON_KEY`
    - `service_role key` (or Secret key) → `SUPABASE_SERVICE_ROLE_KEY`
 5. Load the schema and test data: `npm run db:reset`
 6. Run the app: `npm run dev`, then open http://localhost:3000
 
-Local extras: Supabase Studio (database browser) at http://127.0.0.1:54323, and test emails (password resets) at http://127.0.0.1:54324.
+Local extras: Supabase Studio (database browser) at http://127.0.0.1:54323, and every email the app sends (password resets, notifications) lands in Mailpit at http://127.0.0.1:54324.
+
+**If `db:start` or `db:reset` fails with "ports are not available":** Windows sometimes reserves the 54xxx ports after Docker starts. Check with `netsh interface ipv4 show excludedportrange protocol=tcp`, and clear it from an admin PowerShell with `net stop winnat; net start winnat`.
+
+### Notifications and email
+
+- Notifications are created by the database the moment something happens (class booked, cancelled or moved; homework set, submitted or reviewed; lesson notes shared; materials added; announcements; policy updates).
+- Time-based ones (class reminders 24 h and 1 h before, homework due within 24 h, teachers' daily "waiting more than 48 h" reminder, announcements scheduled for later) and **all emails** are handled by a job at `/api/cron/notifications`.
+- Locally, run it with `npm run notify`. In production, `vercel.json` schedules it every 15 minutes (on Vercel's free plan crons run at most daily, so use the Pro plan or any external scheduler that calls the URL with `Authorization: Bearer <CRON_SECRET>`).
+- Production email: set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `EMAIL_FROM` for your provider (e.g. Resend), plus a long random `CRON_SECRET`.
 
 ## Test accounts (local only)
 
@@ -69,12 +80,15 @@ Run it after every database change.
 
 | Command | What it checks | Needs |
 |---|---|---|
-| `npm run test:rls` | 27 database privacy rules (who can see and change what, double-booking, private files, the homework workflow) | local database |
+| `npm run test:rls` | 33 database privacy rules (who can see and change what, double-booking, private files, homework workflow, notifications, announcements, policies) | local database |
 | `npm run test:smoke` | Every portal page renders the right content for each role, and other people's pages are refused | local database + `npm run dev` |
 | `npm run test:e2e` | Real browser walk-through: schedule, autosave notes, upload, YouTube, complete, student view, reschedule | local database + `npm run dev`; first run `npx playwright install chromium` |
 | `npm run test:e2e:homework` | Real browser walk-through of homework: assign, draft, photo upload, submit, review, revision, version 2, complete | same as above |
+| `npm run test:e2e:phase4` | Announcement → bell → notification centre, email delivered to Mailpit, email settings, policy gate and acceptance, publishing a new policy version | same as above (also needs Docker for cleanup) |
 
 Run `npm run db:reset` first if you have changed data by hand: the tests expect the seed data.
+
+**The tests only run against a local database.** They read `.env.local` and refuse to start if it points anywhere else. If your `.env.local` points to a hosted project, keep the local settings in another file and name it for the tests and the app: `$env:ENV_FILE=".env.test"` for the tests (PowerShell), plus the same values as process variables for `npm run dev`, which take priority over `.env.local`.
 
 ## Decisions made for Phase 2 (change if needed)
 
@@ -97,3 +111,21 @@ Run `npm run db:reset` first if you have changed data by hand: the tests expect 
 - Admins can see all homework but not change it.
 - Not yet built (Phase 4): notifications for new homework, submissions, deadlines and feedback. Guardians will not receive homework emails.
 - Inline highlighting inside a student's answer (a "Should" story) is not built. Teachers write corrections in the Corrections box or upload a marked-up file.
+
+## Decisions made for Phase 4.5 (change if needed)
+
+- Portal links load only when tapped. Next.js's background loading of visible links caused dozens of extra server calls per page. Use `@/components/Link` in the portals, and `next/link` on the public site.
+- The portals have no `loading.tsx`, on purpose: it would make refused pages return 200 instead of a real 404. A progress bar shows on tap instead.
+- The middleware only reads the session cookie. The real login check is `requireRole()` in each portal's layout, so every new portal must use it. `npm run test:smoke` checks that a forged cookie is refused.
+- Open homework and completed homework are loaded separately. Never load them as one list ordered by deadline: old completed work pushes out recent work and makes counts wrong.
+- YouTube's player loads when play is pressed. Before that, the page shows a thumbnail from YouTube.
+- Lists show 50 rows a page. Lesson history keeps the latest 300 classes, and completed homework the latest 200.
+
+## Decisions made for Phase 4 (change if needed)
+
+- Everything appears in the in-site notification centre. Email is on for every type by default, and each person can switch types off in **Settings**. Admins don't receive these notifications.
+- People are not notified about changes they made themselves (e.g. a teacher who books a class isn't told about it). A weekly series sends one message, not one per class.
+- Inactive accounts receive no notifications. Guardians receive no emails yet.
+- Announcements go to everyone, all teachers, all students, or chosen people, either now or at a scheduled time, with an optional end date.
+- Class policies are versioned. A published version can't be edited, only replaced by a new one. Students must accept the latest version before they can use their account; the acceptance time, IP address and browser are recorded. Teachers are notified about updates but aren't asked to accept.
+- Changing a password requires the current password.

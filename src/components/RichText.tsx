@@ -36,7 +36,19 @@ export function RichText({ text, className = "" }: { text: string; className?: s
   return (
     <div className={`space-y-2 text-sm ${className}`}>
       {blocks.map((block, bi) => {
-        const lines = block.split("\n");
+        let lines = block.split("\n");
+        // "## Heading" on the first line of a block (used in class policies)
+        if (/^#{1,3}\s+/.test(lines[0])) {
+          const heading = <h3 className="pt-2 text-base font-semibold">{inline(lines[0].replace(/^#{1,3}\s+/, ""), `h${bi}`)}</h3>;
+          lines = lines.slice(1);
+          if (lines.length === 0) return <Fragment key={bi}>{heading}</Fragment>;
+          return (
+            <Fragment key={bi}>
+              {heading}
+              <RichText text={lines.join("\n")} />
+            </Fragment>
+          );
+        }
         if (lines.every((l) => /^\s*[-*•]\s+/.test(l))) {
           return (
             <ul key={bi} className="list-disc space-y-1 pl-5">
@@ -70,4 +82,4 @@ export function RichText({ text, className = "" }: { text: string; className?: s
   );
 }
 
-export const FORMAT_HINT = "Formatting: **bold**, *italic*, lines starting with - for bullets or 1. for numbers. Links work automatically.";
+export const FORMAT_HINT = "Formatting: **bold**, *italic*, lines starting with - for bullets or 1. for numbers, ## for a heading. Links work automatically.";

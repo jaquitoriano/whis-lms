@@ -33,6 +33,35 @@ body {
   color: var(--foreground);
 }
 
+/* Visible focus for keyboard users. */
+:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+.nav-progress {
+  position: fixed;
+  inset: 0 auto auto 0;
+  z-index: 50;
+  height: 3px;
+  background: var(--brand-500);
+  animation: nav-progress 8s cubic-bezier(0.1, 0.7, 0.2, 1) forwards;
+}
+@keyframes nav-progress {
+  from {
+    width: 8%;
+  }
+  to {
+    width: 92%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress {
+    width: 60%;
+    animation: none;
+  }
+}
+
 @layer components {
   .btn-primary,
   .btn-secondary,
@@ -59,5 +88,15 @@ body {
   }
   .badge {
     @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+  /* Phones: 16px text stops iPhones zooming in on every form field, and buttons are easy to tap. */
+  @media (max-width: 767px) {
+    .input {
+      @apply text-base;
+    }
+    .btn-primary,
+    .btn-secondary {
+      min-height: 44px;
+    }
   }
 }

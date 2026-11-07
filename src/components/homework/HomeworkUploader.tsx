@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { uploadWithProgress } from "@/lib/upload";
 import { registerHomeworkFile } from "@/lib/homework-actions";
 import { HOMEWORK_ACCEPT, HOMEWORK_MAX_BYTES, type FileKind } from "@/lib/homework-shared";
 
@@ -37,15 +37,18 @@ export function HomeworkUploader({
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [percent, setPercent] = useState(0);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   async function upload(files: FileList | null) {
     if (!files?.length) return;
     setMsg(null);
-    const supabase = createClient();
+    const list = Array.from(files);
     let done = 0;
-    for (const original of Array.from(files)) {
-      setBusy(`Uploading ${original.name}…`);
+    for (const [i, original] of list.entries()) {
+      const counter = list.length > 1 ? ` (${i + 1} of ${list.length})` : "";
+      setPercent(0);
+      setBusy(`Preparing ${original.name}${counter}…`);
       const file = await normalise(original);
       if (file.size > HOMEWORK_MAX_BYTES) {
         setMsg({ ok: false, text: `${original.name} is larger than 25 MB.` });
@@ -54,9 +57,10 @@ export function HomeworkUploader({
       const safe = file.name.replace(/[^\w.\-]+/g, "_").slice(-100);
       const folder = kind === "reference" ? `${assignmentId}/reference` : `${assignmentId}/${submissionId}/${kind}`;
       const path = `${folder}/${crypto.randomUUID()}-${safe}`;
-      const up = await supabase.storage.from("homework").upload(path, file, { contentType: file.type || undefined });
+      setBusy(`Uploading ${original.name}${counter}…`);
+      const up = await uploadWithProgress("homework", path, file, setPercent);
       if (up.error) {
-        setMsg({ ok: false, text: /mime|type/i.test(up.error.message) ? `${original.name}: that file type isn't allowed.` : `${original.name}: upload failed.` });
+        setMsg({ ok: false, text: /mime|type/i.test(up.error) ? `${original.name}: that file type isn't allowed.` : `${original.name}: upload failed.` });
         continue;
       }
       const r = await registerHomeworkFile({ assignmentId, submissionId, kind, path, name: file.name, type: file.type, size: file.size });
@@ -73,7 +77,7 @@ export function HomeworkUploader({
 
   return (
     <div className="space-y-2">
-      {msg && <p className={`rounded-lg px-3 py-2 text-sm ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{msg.text}</p>}
+      {msg && <p role={msg.ok ? undefined : "alert"} className={`rounded-lg px-3 py-2 text-sm ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{msg.text}</p>}
       <label className={`btn-secondary cursor-pointer ${busy ? "pointer-events-none opacity-60" : ""}`}>
         {busy ?? label}
         <input
@@ -87,6 +91,7 @@ export function HomeworkUploader({
           aria-label={label}
         />
       </label>
+      {busy && <progress className="block h-2 w-full max-w-sm accent-brand-600" value={percent} max={100} aria-label={busy} />}
       <p className="text-xs text-muted">{hint}</p>
     </div>
   );

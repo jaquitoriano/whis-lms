@@ -8,7 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 
 function loadEnv() {
   try {
-    for (const line of readFileSync(".env.local", "utf8").split(/\r?\n/)) {
+    for (const line of readFileSync(process.env.ENV_FILE ?? ".env.local", "utf8").split(/\r?\n/)) {
       const m = line.match(/^([A-Z_]+)=(.*)$/);
       if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
     }
@@ -16,9 +16,9 @@ function loadEnv() {
 }
 loadEnv();
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-assert.ok(URL && ANON, "Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local");
+const URL = process.env.NEXT_SUPABASE_URL;
+const ANON = process.env.NEXT_SUPABASE_ANON_KEY;
+assert.ok(URL && ANON, "Set NEXT_SUPABASE_URL and NEXT_SUPABASE_ANON_KEY in .env.local");
 assert.ok(/127\.0\.0\.1|localhost/.test(URL), "Refusing to run privacy tests against a non-local database");
 
 const ID = {
@@ -461,5 +461,164 @@ test("homework files are private: drafts, other students and unsent corrections"
     assert.equal((await kenji.storage.from("homework").createSignedUrl(cp, 60)).error, null, "correction visible after sending");
   } finally {
     await removeHomework(id);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Phase 4: notifications, announcements, policies
+// ---------------------------------------------------------------------------
+const svc4 = () => createClient(URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+const latestNote = async (client, type) =>
+  (await client.from("notifications").select("type, title, body, link, email_status").eq("type", type).order("created_at", { ascending: false }).limit(1)).data?.[0];
+
+test("notifications are private and can't be forged", async () => {
+  const kenji = await as("student1@school.test");
+  const { data } = await kenji.from("notifications").select("user_id");
+  assert.ok(data.length > 0 && data.every((n) => n.user_id === ID.kenji));
+  const ins = await kenji.from("notifications").insert({ user_id: ID.ana, type: "x", title: "spoof" });
+  assert.ok(ins.error, "clients can't insert notifications");
+  const rpc = await kenji.rpc("notify", { p_user: ID.ana, p_type: "x", p_title: "spoof", p_body: "", p_link: "/" });
+  assert.ok(rpc.error, "clients can't call notify()");
+  const gen = await kenji.rpc("generate_scheduled_notifications");
+  assert.ok(gen.error, "clients can't run the scheduled job");
+  const ana = await as("student2@school.test");
+  await ana.rpc("mark_notifications_read", { p_ids: null });
+  const still = await kenji.from("notifications").select("id").is("read_at", null);
+  assert.ok(still.data.length > 0, "marking read only affects your own notifications");
+});
+
+test("events notify the right person: class, homework submit/review, cancellation", async () => {
+  const maria = await as("teacher1@school.test");
+  const kenji = await as("student1@school.test");
+  const admin = await as("admin@school.test");
+  const start = new Date(Date.now() + 40 * 86400000);
+  const { data: cls } = await maria.from("class_sessions")
+    .insert({ teacher_id: ID.maria, student_id: ID.kenji, starts_at: start.toISOString(), ends_at: new Date(start.getTime() + 50 * 60000).toISOString() })
+    .select("id").single();
+  let hwId;
+  try {
+    const n1 = await latestNote(kenji, "class_scheduled");
+    assert.equal(n1.link, `/student/classes/${cls.id}`, "student told about the new class");
+    assert.equal((await maria.from("notifications").select("id").eq("link", `/teacher/classes/${cls.id}`)).data.length, 0, "the teacher who booked it isn't notified");
+
+    const { data: hw } = await maria.from("homework_assignments")
+      .insert({ teacher_id: ID.maria, student_id: ID.kenji, title: "Notify test", due_at: new Date(Date.now() + 86400000).toISOString() })
+      .select("id").single();
+    hwId = hw.id;
+    assert.equal((await latestNote(kenji, "homework_assigned")).link, `/student/homework/${hw.id}`);
+    const { data: d } = await kenji.rpc("open_homework_draft", { p_assignment: hw.id });
+    await kenji.from("homework_submissions").update({ answer_text: "x" }).eq("id", d);
+    await kenji.rpc("submit_homework", { p_assignment: hw.id });
+    const sub = await latestNote(maria, "homework_submitted");
+    assert.equal(sub.link, `/teacher/homework/${hw.id}`);
+    assert.match(sub.title, /Kenji Tanaka submitted Notify test/);
+    await maria.rpc("send_homework_review", { p_submission: d, p_decision: "completed" });
+    assert.match((await latestNote(kenji, "homework_reviewed")).title, /Homework checked/);
+
+    await admin.from("class_sessions").update({ status: "cancelled", status_reason: "Holiday" }).eq("id", cls.id);
+    const c1 = await latestNote(kenji, "class_cancelled");
+    assert.match(c1.body, /cancelled: Holiday/);
+    assert.equal((await latestNote(maria, "class_cancelled")).link, `/teacher/classes/${cls.id}`, "teacher told when the admin cancels");
+  } finally {
+    const s = svc4();
+    if (hwId) await s.from("homework_assignments").delete().eq("id", hwId);
+    await s.from("class_sessions").delete().eq("id", cls.id);
+  }
+});
+
+test("email opt-out per type; inactive accounts get nothing", async () => {
+  const kenji = await as("student1@school.test");
+  const maria = await as("teacher1@school.test");
+  const admin = await as("admin@school.test");
+  await kenji.from("notification_preferences").upsert({ user_id: ID.kenji, type: "homework_assigned", email: false });
+  const ids = [];
+  try {
+    const a = await maria.from("homework_assignments").insert({ teacher_id: ID.maria, student_id: ID.kenji, title: "Opt-out test", due_at: new Date(Date.now() + 86400000).toISOString() }).select("id").single();
+    ids.push(a.data.id);
+    const n = await latestNote(kenji, "homework_assigned");
+    assert.equal(n.email_status, "skipped", "opted-out email is not sent");
+    await kenji.from("notification_preferences").upsert({ user_id: ID.kenji, type: "homework_assigned", email: true });
+    const b = await maria.from("homework_assignments").insert({ teacher_id: ID.maria, student_id: ID.kenji, title: "Opt-in test", due_at: new Date(Date.now() + 86400000).toISOString() }).select("id").single();
+    ids.push(b.data.id);
+    assert.equal((await latestNote(kenji, "homework_assigned")).email_status, "pending");
+
+    await admin.from("profiles").update({ status: "inactive" }).eq("id", ID.minjun);
+    const before = (await svc4().from("notifications").select("id", { count: "exact", head: true }).eq("user_id", ID.minjun)).count;
+    const c = await maria.from("homework_assignments").insert({ teacher_id: ID.maria, student_id: ID.minjun, title: "Inactive test", due_at: new Date(Date.now() + 86400000).toISOString() }).select("id").single();
+    ids.push(c.data.id);
+    const after = (await svc4().from("notifications").select("id", { count: "exact", head: true }).eq("user_id", ID.minjun)).count;
+    assert.equal(after, before, "inactive student isn't notified");
+  } finally {
+    await admin.from("profiles").update({ status: "active" }).eq("id", ID.minjun);
+    await svc4().from("homework_assignments").delete().in("id", ids);
+    await svc4().from("notification_preferences").delete().eq("user_id", ID.kenji);
+  }
+});
+
+test("announcements reach only their audience", async () => {
+  const admin = await as("admin@school.test");
+  const kenji = await as("student1@school.test");
+  const ana = await as("student2@school.test");
+  const maria = await as("teacher1@school.test");
+  const mk = async (row, recipients = []) => {
+    const { data } = await admin.from("announcements").insert({ ...row, created_by: ID.admin }).select("id").single();
+    if (recipients.length) await admin.from("announcement_recipients").insert(recipients.map((user_id) => ({ announcement_id: data.id, user_id })));
+    await admin.rpc("deliver_announcement", { p_id: data.id });
+    return data.id;
+  };
+  const ids = [];
+  try {
+    ids.push(await mk({ title: "Teachers only", audience: "all_teachers" }));
+    ids.push(await mk({ title: "Just Kenji", audience: "specific" }, [ID.kenji]));
+    ids.push(await mk({ title: "Later", audience: "everyone", publish_at: new Date(Date.now() + 86400000).toISOString() }));
+    const seen = async (c) => (await c.from("announcements").select("title").in("id", ids)).data.map((r) => r.title).sort();
+    assert.deepEqual(await seen(maria), ["Teachers only"]);
+    assert.deepEqual(await seen(kenji), ["Just Kenji"]);
+    assert.deepEqual(await seen(ana), [], "scheduled announcements stay hidden until published");
+    assert.equal((await latestNote(kenji, "announcement")).title, "Just Kenji");
+    const forged = await kenji.from("announcements").insert({ title: "spoof", audience: "everyone" });
+    assert.ok(forged.error, "students can't post announcements");
+    const deliver = await kenji.rpc("deliver_announcement", { p_id: ids[2] });
+    assert.ok(deliver.error, "students can't trigger delivery");
+  } finally {
+    await admin.from("announcements").delete().in("id", ids);
+  }
+});
+
+test("class policies: versioned, admin-only, students must accept the latest", async () => {
+  const kenji = await as("student1@school.test");
+  const minjun = await as("student3@school.test");
+  const maria = await as("teacher1@school.test");
+  assert.equal((await kenji.rpc("needs_policy_acceptance")).data, false);
+  assert.equal((await minjun.rpc("needs_policy_acceptance")).data, true, "Min-jun hasn't accepted v1");
+  assert.equal((await maria.rpc("needs_policy_acceptance")).data, false, "teachers aren't gated");
+  assert.ok((await kenji.from("policies").insert({ version: 99, body: "x".repeat(30) })).error, "students can't publish");
+  const admin = await as("admin@school.test");
+  await admin.from("policies").update({ body: "changed" }).eq("version", 1);
+  const v1 = await kenji.from("policies").select("body").eq("version", 1).single();
+  assert.notEqual(v1.data.body, "changed", "published versions are immutable");
+  const del = await svc4().from("policies").delete().eq("version", 1);
+  assert.ok(del.error, "even the server can't delete a published version");
+  const wrong = await minjun.from("policy_acceptances").insert({ version: 0, user_id: ID.minjun });
+  assert.ok(wrong.error, "can only accept the latest version");
+  const other = await minjun.from("policy_acceptances").insert({ version: 1, user_id: ID.ana });
+  assert.ok(other.error, "can't accept on someone else's behalf");
+});
+
+test("scheduled job creates class reminders once", async () => {
+  const s = svc4();
+  const start = new Date(Date.now() + 30 * 60000);
+  const { data: cls } = await s.from("class_sessions")
+    .insert({ teacher_id: ID.james, student_id: ID.ana, starts_at: start.toISOString(), ends_at: new Date(start.getTime() + 50 * 60000).toISOString() })
+    .select("id").single();
+  try {
+    assert.equal((await s.rpc("generate_scheduled_notifications")).error, null);
+    await s.rpc("generate_scheduled_notifications");
+    const { data } = await s.from("notifications").select("user_id, title").eq("dedupe_key", `reminder_1h:${cls.id}`);
+    assert.equal(data.length, 2, "one reminder each for teacher and student, even after running twice");
+    assert.ok(data.every((n) => n.title === "Class starts within the hour"));
+  } finally {
+    await s.from("notifications").delete().like("dedupe_key", `%${cls.id}`);
+    await s.from("class_sessions").delete().eq("id", cls.id);
   }
 });

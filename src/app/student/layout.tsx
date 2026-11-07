@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { PortalShell, type NavItem } from "@/components/PortalShell";
 
@@ -9,14 +10,21 @@ const nav: NavItem[] = [
   { href: "/student/materials", label: "Lesson Materials" },
   { href: "/student/lessons", label: "Lesson History" },
   { href: "/student/homework", label: "Homework" },
-  { href: "/student/policies", label: "Class Policies", phase: 4 },
+  { href: "/student/announcements", label: "Announcements" },
+  { href: "/student/policies", label: "Class Policies" },
+  { href: "/student/settings", label: "Settings" },
   { href: "/student/contract", label: "My Contract", phase: 5 },
   { href: "/student/progress", label: "My Progress", phase: 6 },
   { href: "/student/messages", label: "Messages", phase: 6 },
 ];
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
-  const { profile } = await requireRole("student");
+  const { profile, supabase } = await requireRole("student");
+  // POL-04: until the student accepts the latest class policies, the whole student area
+  // redirects to the acceptance page (which sits outside this layout, so it can't loop,
+  // and no page data is sent before acceptance).
+  const { data: mustAccept } = await supabase.rpc("needs_policy_acceptance");
+  if (mustAccept) redirect("/accept-policies");
   return (
     <PortalShell profile={profile} roleLabel="Student" nav={nav}>
       {children}

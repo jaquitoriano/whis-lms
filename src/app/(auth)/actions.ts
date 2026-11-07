@@ -17,6 +17,7 @@ export async function signIn(_prev: ActionState, formData: FormData): Promise<Ac
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) console.error("signIn failed:", error.status, error.message);
   if (error || !data.user) return { error: "Incorrect email or password." };
 
   const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", data.user.id).single<{ role: Role; status: string }>();
@@ -29,13 +30,13 @@ export async function signIn(_prev: ActionState, formData: FormData): Promise<Ac
 
 export async function signOut() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" }); // This device only; other devices stay signed in.
   redirect("/login");
 }
 
 export async function requestPasswordReset(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const email = String(formData.get("email") ?? "").trim();
-  const origin = (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const origin = (await headers()).get("origin") ?? process.env.NEXT_SITE_URL ?? "http://localhost:3000";
   const supabase = await createClient();
   await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${origin}/auth/confirm?next=/reset-password` });
   // Same answer whether or not the email exists, so accounts can't be discovered.

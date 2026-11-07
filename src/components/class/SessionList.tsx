@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { classPath, counterpart, statusLabel, statusStyle, type SessionRow } from "@/lib/sessions";
 import { formatDateTime } from "@/lib/time";
 import type { Role } from "@/lib/types";

@@ -1,24 +1,29 @@
 import { requireRole } from "@/lib/auth";
-import { listHomework } from "@/lib/homework";
+import { countCompletedHomework, listHomework, OPEN_HOMEWORK, OPEN_LIMIT } from "@/lib/homework";
 import { isOverdue } from "@/lib/homework-shared";
 import { HomeworkTable } from "@/components/homework/HomeworkTable";
 import { Tabs } from "@/components/homework/Tabs";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, Pager, paginate, PER_PAGE } from "@/components/ui";
 
 export const metadata = { title: "Homework" };
 
 // HW-S08: one list, nearest deadline first, filtered by state.
-export default async function StudentHomeworkPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function StudentHomeworkPage({ searchParams }: { searchParams: Promise<{ tab?: string; page?: string }> }) {
   const { supabase, profile } = await requireRole("student");
-  const { tab = "todo" } = await searchParams;
-  const all = await listHomework(supabase, { studentId: profile.id });
+  const { tab = "todo", page } = await searchParams;
+  const [open, completed, completedTotal] = await Promise.all([
+    listHomework(supabase, { studentId: profile.id, statuses: OPEN_HOMEWORK, limit: OPEN_LIMIT }),
+    listHomework(supabase, { studentId: profile.id, statuses: ["completed"], newestFirst: true, limit: PER_PAGE * 4 }),
+    countCompletedHomework(supabase, { studentId: profile.id }),
+  ]);
   const groups = {
-    todo: all.filter((h) => h.status === "assigned"),
-    revision: all.filter((h) => h.status === "needs_revision"),
-    submitted: all.filter((h) => h.status === "submitted" || h.status === "under_review"),
-    completed: all.filter((h) => h.status === "completed").reverse(),
+    todo: open.filter((h) => h.status === "assigned"),
+    revision: open.filter((h) => h.status === "needs_revision"),
+    submitted: open.filter((h) => h.status === "submitted" || h.status === "under_review"),
+    completed,
   };
   const active = (Object.keys(groups) as (keyof typeof groups)[]).includes(tab as keyof typeof groups) ? (tab as keyof typeof groups) : "todo";
+  const list = paginate(groups[active], page);
   const overdue = [...groups.todo, ...groups.revision].filter((h) => isOverdue(h) && h.is_required).length;
 
   return (
@@ -31,10 +36,11 @@ export default async function StudentHomeworkPage({ searchParams }: { searchPara
           { key: "todo", label: "To do", count: groups.todo.length },
           { key: "revision", label: "Needs revision", count: groups.revision.length },
           { key: "submitted", label: "Submitted", count: groups.submitted.length },
-          { key: "completed", label: "Completed", count: groups.completed.length },
+          { key: "completed", label: "Completed", count: completedTotal },
         ]}
       />
-      <HomeworkTable rows={groups[active]} viewer="student" tz={profile.timezone} empty="Nothing here." />
+      <HomeworkTable rows={list.rows} viewer="student" tz={profile.timezone} empty="Nothing here." />
+      <Pager {...list} base="/student/homework" params={{ tab: active }} />
     </>
   );
 }

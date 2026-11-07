@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { requireRole } from "@/lib/auth";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { formatDateTime } from "@/lib/time";
@@ -13,26 +13,38 @@ type Row = {
   kind: "file" | "link";
   storage_path: string | null;
   url: string | null;
+  created_at: string;
   session: { id: string; starts_at: string; status: string } | null;
 };
-type VideoRow = { id: string; youtube_id: string; title: string; session: { id: string; starts_at: string } | null };
+type VideoRow = { id: string; youtube_id: string; title: string; created_at: string; session: { id: string; starts_at: string } | null };
+type SessionWith<K extends string, T> = { id: string; starts_at: string; status: string } & Record<K, T[]>;
+
+const newestFirst = (a: { created_at: string }, b: { created_at: string }) => b.created_at.localeCompare(a.created_at);
 
 // Every material and video from the student's classes in one place (VID-04).
 export default async function StudentMaterialsPage() {
   const { supabase, profile } = await requireRole("student");
-  const [{ data: mats }, { data: vids }] = await Promise.all([
-    supabase.from("materials").select("*, session:class_sessions!inner(id, starts_at, status, student_id)").eq("session.student_id", profile.id).order("created_at", { ascending: false }).limit(200),
-    supabase.from("videos").select("id, youtube_id, title, session:class_sessions!inner(id, starts_at, student_id)").eq("session.student_id", profile.id).order("created_at", { ascending: false }).limit(100),
+  // Start from the student's classes. Starting from the materials table makes the access check run
+  // on every material in the school (1.6 s with 7,000 rows) before the student filter applies.
+  const [{ data: withMats }, { data: withVids }] = await Promise.all([
+    supabase.from("class_sessions").select("id, starts_at, status, materials!inner(*)").eq("student_id", profile.id).order("starts_at", { ascending: false }).limit(200),
+    supabase.from("class_sessions").select("id, starts_at, status, videos!inner(id, youtube_id, title, created_at)").eq("student_id", profile.id).order("starts_at", { ascending: false }).limit(100),
   ]);
-  const rows = (mats ?? []) as unknown as Row[];
-  const videos = (vids ?? []) as unknown as VideoRow[];
+  const rows = ((withMats ?? []) as unknown as SessionWith<"materials", Row>[])
+    .flatMap(({ materials, ...session }) => materials.map((m) => ({ ...m, session })))
+    .sort(newestFirst)
+    .slice(0, 200);
+  const videos = ((withVids ?? []) as unknown as SessionWith<"videos", VideoRow>[])
+    .flatMap(({ videos, ...session }) => videos.map((v) => ({ ...v, session })))
+    .sort(newestFirst)
+    .slice(0, 100);
   const paths = rows.filter((r) => r.kind === "file" && r.storage_path).map((r) => r.storage_path!);
   const signed = paths.length ? (await supabase.storage.from("materials").createSignedUrls(paths, 3600)).data ?? [] : [];
 
   return (
     <>
       <PageHeader title="Lesson materials" />
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
         <section className="card">
           <h2 className="mb-3 font-semibold">Files and links</h2>
           {rows.length === 0 ? (

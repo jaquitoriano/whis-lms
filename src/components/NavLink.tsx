@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { usePathname, useSearchParams } from "next/navigation";
 
 export function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
@@ -23,7 +23,7 @@ export function NavLink({ href, children }: { href: string; children: React.Reac
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm ${active ? "bg-brand-50 font-medium text-brand-700" : "text-foreground hover:bg-slate-50"}`}
+      className={`whitespace-nowrap rounded-lg px-3 py-3 text-sm md:py-2 ${active ? "bg-brand-50 font-medium text-brand-700" : "text-foreground hover:bg-slate-50"}`}
     >
       {children}
     </Link>

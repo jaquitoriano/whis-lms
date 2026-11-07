@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { requireRole } from "@/lib/auth";
 import { getMyStudents } from "@/lib/teacher-data";
 import { getSessions } from "@/lib/sessions";
@@ -7,7 +7,8 @@ import { addDays, todayStr, zonedToUtc } from "@/lib/time";
 import { SessionList } from "@/components/class/SessionList";
 import { HomeworkTable } from "@/components/homework/HomeworkTable";
 import { listHomework } from "@/lib/homework";
-import { Avatar, ComingSoon, PageHeader, StatCard } from "@/components/ui";
+import { AnnouncementsPanel } from "@/components/portal/Announcements";
+import { Avatar, PageHeader, StatCard } from "@/components/ui";
 
 export const metadata = { title: "Teacher dashboard" };
 
@@ -15,13 +16,13 @@ export default async function TeacherDashboard() {
   const { supabase, profile } = await requireRole("teacher");
   const tz = profile.timezone;
   const today = todayStr(tz);
-  const [students, todays, upcoming, history] = await Promise.all([
+  const [students, todays, upcoming, history, toReview] = await Promise.all([
     getMyStudents(supabase, profile.id),
     getSessions(supabase, { from: zonedToUtc(today, "00:00", tz), to: zonedToUtc(addDays(today, 1), "00:00", tz), teacherId: profile.id }),
     getSessions(supabase, { from: zonedToUtc(addDays(today, 1), "00:00", tz), to: zonedToUtc(addDays(today, 8), "00:00", tz), teacherId: profile.id }),
     getLessonHistory(supabase, { teacherId: profile.id, limit: 50 }),
+    listHomework(supabase, { teacherId: profile.id, statuses: ["submitted", "under_review"] }),
   ]);
-  const toReview = await listHomework(supabase, { teacherId: profile.id, statuses: ["submitted", "under_review"] });
   const todayActive = todays.filter((s) => s.status !== "cancelled" && s.status !== "rescheduled");
   const upcomingActive = upcoming.filter((s) => s.status === "scheduled");
   const needsNotes = history.filter(
@@ -47,7 +48,7 @@ export default async function TeacherDashboard() {
         <StatCard label="Homework to review" value={toReview.length} href="/teacher/homework" />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="card">
           <h2 className="mb-2 font-semibold">Today</h2>
           <SessionList sessions={todays} viewer="teacher" tz={tz} empty="No classes today." />
@@ -90,7 +91,7 @@ export default async function TeacherDashboard() {
           <h2 className="mb-2 font-semibold">Homework to review</h2>
           <HomeworkTable rows={toReview.slice(0, 6)} viewer="teacher" tz={tz} empty="Nothing waiting for review." />
         </section>
-        <ComingSoon phase={4}>School announcements will appear here.</ComingSoon>
+        <AnnouncementsPanel supabase={supabase} role="teacher" tz={tz} />
       </div>
     </>
   );

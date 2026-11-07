@@ -13,13 +13,16 @@
     "db:stop": "supabase stop",
     "test:smoke": "node tests/smoke.mjs",
     "test:e2e": "node tests/e2e.mjs",
-    "test:e2e:homework": "node tests/e2e-homework.mjs"
+    "test:e2e:homework": "node tests/e2e-homework.mjs",
+    "test:e2e:phase4": "node tests/e2e-phase4.mjs",
+    "notify": "node scripts/run-notifications.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.58.0",
     "heic2any": "^0.0.4",
-    "next": "15.5.9",
+    "next": "^16.4.5",
+    "nodemailer": "^10.3.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "server-only": "^0.0.1"
@@ -28,10 +31,11 @@
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.5.4",
+    "eslint-config-next": "^16.4.5",
     "playwright": "^1.48.2",
     "supabase": "^2.48.3",
     "tailwindcss": "^4",

@@ -11,13 +11,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const env = Object.fromEntries(
-  readFileSync(".env.local", "utf8")
+  readFileSync(process.env.ENV_FILE ?? ".env.local", "utf8")
     .split(/\r?\n/)
     .filter(Boolean)
     .map((l) => l.split(/=(.*)/s).slice(0, 2)),
 );
-if (!/127\.0\.0\.1|localhost/.test(env.NEXT_PUBLIC_SUPABASE_URL)) throw new Error("E2E tests run against the local database only");
-const svc = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+if (!/127\.0\.0\.1|localhost/.test(env.NEXT_SUPABASE_URL)) throw new Error("E2E tests run against the local database only");
+const svc = createClient(env.NEXT_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 const B = process.env.BASE_URL ?? "http://localhost:3000";
 const CLASS = "20000000-0000-4000-a000-000000000003"; // Kenji's upcoming class with Maria
 

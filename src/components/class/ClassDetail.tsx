@@ -1,10 +1,11 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ActionForm } from "@/components/ActionForm";
 import { SubmitButton } from "@/components/SubmitButton";
 import { LessonRecordEditor } from "./LessonRecordEditor";
 import { MaterialUploader } from "./MaterialUploader";
+import { YouTubePlayer } from "./YouTubePlayer";
 import { StatusPanel } from "./StatusPanel";
 import { getSession, statusLabel, statusStyle, classPath } from "@/lib/sessions";
 import { LESSON_SECTIONS, type LessonRecord } from "@/lib/lesson-fields";
@@ -43,14 +44,14 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
   const tz = viewer.timezone;
 
   await (canManage ? supabase.rpc("ensure_lesson_record", { p_session: id }) : Promise.resolve());
-  const [{ data: materials }, { data: videos }, { data: record }, { data: priv }, { data: next }] = await Promise.all([
+  const [{ data: materials }, { data: videos }, { data: record }, { data: priv }, { data: next }, homework] = await Promise.all([
     supabase.from("materials").select("*").eq("session_id", id).order("created_at"),
     supabase.from("videos").select("*").eq("session_id", id).order("created_at"),
     supabase.from("lesson_records").select("*").eq("session_id", id).maybeSingle(),
     canManage ? supabase.from("lesson_private_notes").select("notes").eq("session_id", id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from("class_sessions").select("id").eq("rescheduled_from_id", id).maybeSingle(),
+    listHomework(supabase, { sessionId: id }),
   ]);
-  const homework = await listHomework(supabase, { sessionId: id });
   const isOwnerTeacher = viewer.role === "teacher" && s.teacher_id === viewer.id;
   const mats = (materials ?? []) as Material[];
   const vids = (videos ?? []) as Video[];
@@ -169,7 +170,7 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
         )}
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="card">
           <h2 className="mb-3 font-semibold">Learning materials</h2>
           {mats.length === 0 ? (
@@ -226,16 +227,7 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
           <div className="space-y-4">
             {vids.map((v) => (
               <div key={v.id}>
-                <div className="aspect-video overflow-hidden rounded-lg bg-slate-100">
-                  <iframe
-                    className="h-full w-full"
-                    src={`https://www.youtube-nocookie.com/embed/${v.youtube_id}`}
-                    title={v.title}
-                    loading="lazy"
-                    allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                </div>
+                <YouTubePlayer id={v.youtube_id} title={v.title} />
                 <div className="mt-2 flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium">{v.title}</p>

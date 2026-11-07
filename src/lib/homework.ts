@@ -2,21 +2,35 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Homework, HomeworkFile, HomeworkStatus, Review, Submission } from "@/lib/homework-shared";
 
+// Work still in progress, as opposed to the completed archive that grows forever. Load these
+// separately: a single list ordered by deadline fills up with old completed work, which hides
+// everything recent (and makes counts like "to review" wrong) once a school has enough history.
+export const OPEN_HOMEWORK: HomeworkStatus[] = ["assigned", "submitted", "under_review", "needs_revision"];
+export const OPEN_LIMIT = 1000;
+
 const HW_SELECT =
   "*, teacher:profiles!homework_assignments_teacher_id_fkey(id, full_name), student:profiles!homework_assignments_student_id_fkey(id, full_name)";
 
 // RLS limits rows to what the viewer may see; filters narrow further.
 export async function listHomework(
   supabase: SupabaseClient,
-  f: { teacherId?: string; studentId?: string; sessionId?: string; statuses?: HomeworkStatus[]; limit?: number } = {},
+  f: { teacherId?: string; studentId?: string; sessionId?: string; statuses?: HomeworkStatus[]; limit?: number; newestFirst?: boolean } = {},
 ) {
-  let q = supabase.from("homework_assignments").select(HW_SELECT).order("due_at", { ascending: true }).limit(f.limit ?? 300);
+  let q = supabase.from("homework_assignments").select(HW_SELECT).order("due_at", { ascending: !f.newestFirst }).limit(f.limit ?? 300);
   if (f.teacherId) q = q.eq("teacher_id", f.teacherId);
   if (f.studentId) q = q.eq("student_id", f.studentId);
   if (f.sessionId) q = q.eq("session_id", f.sessionId);
   if (f.statuses?.length) q = q.in("status", f.statuses);
   const { data } = await q;
   return (data ?? []) as unknown as Homework[];
+}
+
+export async function countCompletedHomework(supabase: SupabaseClient, f: { teacherId?: string; studentId?: string }) {
+  let q = supabase.from("homework_assignments").select("id", { count: "exact", head: true }).eq("status", "completed");
+  if (f.teacherId) q = q.eq("teacher_id", f.teacherId);
+  if (f.studentId) q = q.eq("student_id", f.studentId);
+  const { count } = await q;
+  return count ?? 0;
 }
 
 // Latest handed-in time per assignment, for "waiting more than 48 h" flags.

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import {
   addDays,
   addMonths,
@@ -61,10 +61,11 @@ function Chip({ s, viewer, tz, compact }: { s: SessionRow; viewer: Role; tz: str
   return (
     <Link
       href={classPath(viewer, s.id)}
-      className={`block rounded-md border px-2 py-1 text-xs hover:ring-2 hover:ring-brand-100 ${statusStyle[s.status]}`}
+      className={`block overflow-hidden rounded-md border text-xs hover:ring-2 hover:ring-brand-100 ${compact ? "px-1 py-0.5 sm:px-2 sm:py-1" : "px-2 py-1"} ${statusStyle[s.status]}`}
       title={`${statusLabel[s.status]} · ${counterpart(s, viewer)}`}
+      aria-label={`${formatTime(s.starts_at, tz)}, ${counterpart(s, viewer)}, ${statusLabel[s.status]}`}
     >
-      <span className="font-medium">{formatTime(s.starts_at, tz)}</span> <span className="truncate">{counterpart(s, viewer)}</span>
+      <span className="font-medium">{formatTime(s.starts_at, tz)}</span> <span className={compact ? "hidden truncate sm:inline" : "truncate"}>{counterpart(s, viewer)}</span>
       {!compact && (
         <span className="block truncate opacity-80">
           {s.course?.name ?? "Class"} · {statusLabel[s.status]}
@@ -115,9 +116,12 @@ export function Calendar({
     const k = toDateStr(new Date(dl.due_at), tz);
     dueBy.set(k, [...(dueBy.get(k) ?? []), dl]);
   }
-  const DueChip = ({ dl }: { dl: Deadline }) => (
-    <Link href={dl.href} className={`block truncate rounded-md border border-dashed px-2 py-1 text-xs ${dl.done ? "border-slate-200 text-slate-400" : "border-amber-300 bg-amber-50/50 text-amber-800"}`} title={`Homework due: ${dl.title}`}>
-      Due {formatTime(dl.due_at, tz)} · {dl.title}
+  const DueChip = ({ dl, compact }: { dl: Deadline; compact?: boolean }) => (
+    <Link href={dl.href} aria-label={`Homework due ${formatTime(dl.due_at, tz)}: ${dl.title}`} className={`block truncate rounded-md border border-dashed text-xs ${compact ? "px-1 py-0.5 sm:px-2 sm:py-1" : "px-2 py-1"} ${dl.done ? "border-slate-200 text-slate-400" : "border-amber-300 bg-amber-50/50 text-amber-800"}`} title={`Homework due: ${dl.title}`}>
+      {compact && <span className="sm:hidden">Due</span>}
+      <span className={compact ? "hidden sm:inline" : undefined}>
+        Due {formatTime(dl.due_at, tz)} · {dl.title}
+      </span>
     </Link>
   );
   const avFor = (d: DateStr) => (availability ?? []).filter((a) => a.weekday === weekdayOf(d));
@@ -140,7 +144,7 @@ export function Calendar({
           <h2 className="ml-2 text-lg font-semibold">{title(view, date, days)}</h2>
         </div>
         <div className="flex items-center gap-3">
-          <span className="hidden text-xs text-muted sm:inline">Times in {tzLabel(tz)}</span>
+          <span className="text-xs text-muted">Times in {tzLabel(tz)}</span>
           <div className="inline-flex overflow-hidden rounded-lg border border-border" role="group" aria-label="Calendar view">
             {(["day", "week", "month"] as const).map((v) => (
               <Link
@@ -170,7 +174,7 @@ export function Calendar({
               const inMonth = d.slice(0, 7) === date.slice(0, 7);
               const items = byDay.get(d) ?? [];
               return (
-                <div key={d} className={`min-h-24 border-b border-r border-border p-1 ${inMonth ? "" : "bg-slate-50/60"}`}>
+                <div key={d} className={`min-h-16 min-w-0 border-b border-r border-border p-0.5 sm:min-h-24 sm:p-1 ${inMonth ? "" : "bg-slate-50/60"}`}>
                   <Link
                     href={href("day", d)}
                     className={`mb-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs ${d === today ? "bg-brand-600 font-semibold text-white" : inMonth ? "" : "text-slate-400"}`}
@@ -179,7 +183,7 @@ export function Calendar({
                   </Link>
                   <div className="space-y-1">
                     {(dueBy.get(d) ?? []).slice(0, 1).map((dl) => (
-                      <DueChip key={dl.id} dl={dl} />
+                      <DueChip key={dl.id} dl={dl} compact />
                     ))}
                     {items.slice(0, 3).map((s) => (
                       <Chip key={s.id} s={s} viewer={viewer} tz={tz} compact />
@@ -210,7 +214,7 @@ export function Calendar({
                     {formatDay(d)}
                   </Link>
                   {newHref && (
-                    <Link href={newHref(d)} className="rounded px-1.5 text-sm text-brand-700 hover:bg-brand-50" aria-label={`Add class on ${d}`}>
+                    <Link href={newHref(d)} className="inline-flex h-8 w-8 items-center justify-center rounded text-base text-brand-700 hover:bg-brand-50" aria-label={`Add class on ${d}`}>
                       +
                     </Link>
                   )}

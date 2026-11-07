@@ -9,7 +9,9 @@ const nav: NavItem[] = [
   { href: "/teacher/availability", label: "Available Hours" },
   { href: "/teacher/lessons", label: "Lesson Records" },
   { href: "/teacher/homework", label: "Homework" },
-  { href: "/teacher/policies", label: "Class Policies", phase: 4 },
+  { href: "/teacher/announcements", label: "Announcements" },
+  { href: "/teacher/policies", label: "Class Policies" },
+  { href: "/teacher/settings", label: "Settings" },
   { href: "/teacher/progress", label: "Student Progress", phase: 6 },
   { href: "/teacher/messages", label: "Messages", phase: 6 },
 ];

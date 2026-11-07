@@ -1,9 +1,9 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { requireRole } from "@/lib/auth";
-import { listHomework, latestSubmittedAt } from "@/lib/homework";
-import { isOverdue, type HomeworkStatus } from "@/lib/homework-shared";
+import { listHomework, latestSubmittedAt, OPEN_HOMEWORK, OPEN_LIMIT } from "@/lib/homework";
+import { isOverdue, type Homework, type HomeworkStatus } from "@/lib/homework-shared";
 import { HomeworkTable } from "@/components/homework/HomeworkTable";
-import { PageHeader, StatCard } from "@/components/ui";
+import { PageHeader, Pager, paginate, PER_PAGE, StatCard } from "@/components/ui";
 
 export const metadata = { title: "Homework monitoring" };
 
@@ -13,29 +13,33 @@ const STATUSES: HomeworkStatus[] = ["assigned", "submitted", "under_review", "ne
 export default async function AdminHomeworkPage({
   searchParams,
 }: {
-  searchParams: Promise<{ teacher?: string; student?: string; status?: string; flag?: string }>;
+  searchParams: Promise<{ teacher?: string; student?: string; status?: string; flag?: string; page?: string }>;
 }) {
   const { supabase, profile } = await requireRole("admin");
   const sp = await searchParams;
   const status = STATUSES.includes(sp.status as HomeworkStatus) ? (sp.status as HomeworkStatus) : undefined;
 
-  const [all, { data: teachers }, { data: students }] = await Promise.all([
-    listHomework(supabase, { teacherId: sp.teacher || undefined, studentId: sp.student || undefined, statuses: status ? [status] : undefined, limit: 500 }),
+  const who = { teacherId: sp.teacher || undefined, studentId: sp.student || undefined };
+  const none = Promise.resolve([] as Homework[]);
+  // The cards and flags count all open work; the table adds the latest completed work after it.
+  const [open, completed, { data: teachers }, { data: students }] = await Promise.all([
+    status === "completed" ? none : listHomework(supabase, { ...who, statuses: status ? [status] : OPEN_HOMEWORK, limit: OPEN_LIMIT }),
+    status && status !== "completed" ? none : listHomework(supabase, { ...who, statuses: ["completed"], newestFirst: true, limit: PER_PAGE * 4 }),
     supabase.from("profiles").select("id, full_name").eq("role", "teacher").order("full_name"),
     supabase.from("profiles").select("id, full_name").eq("role", "student").order("full_name"),
   ]);
-  const waiting = await latestSubmittedAt(supabase, all.filter((h) => h.status === "submitted" || h.status === "under_review").map((h) => h.id));
+  const waiting = await latestSubmittedAt(supabase, open.filter((h) => h.status === "submitted" || h.status === "under_review").map((h) => h.id));
   const now = Date.now();
-  const overdue = all.filter((h) => h.is_required && isOverdue(h, now));
-  const slow = all.filter((h) => (h.status === "submitted" || h.status === "under_review") && now - Date.parse(waiting.get(h.id) ?? h.due_at) > 48 * 3600000);
-  const rows = sp.flag === "overdue" ? overdue : sp.flag === "slow" ? slow : all;
+  const overdue = open.filter((h) => h.is_required && isOverdue(h, now));
+  const slow = open.filter((h) => (h.status === "submitted" || h.status === "under_review") && now - Date.parse(waiting.get(h.id) ?? h.due_at) > 48 * 3600000);
+  const list = paginate(sp.flag === "overdue" ? overdue : sp.flag === "slow" ? slow : [...open, ...completed], sp.page);
 
   return (
     <>
       <PageHeader title="Homework monitoring" description="View only. Teachers set and review homework." />
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Open with students" value={all.filter((h) => h.status === "assigned" || h.status === "needs_revision").length} />
-        <StatCard label="Waiting for review" value={all.filter((h) => h.status === "submitted" || h.status === "under_review").length} />
+        <StatCard label="Open with students" value={open.filter((h) => h.status === "assigned" || h.status === "needs_revision").length} />
+        <StatCard label="Waiting for review" value={open.filter((h) => h.status === "submitted" || h.status === "under_review").length} />
         <StatCard label="Overdue (required)" value={overdue.length} href="/admin/homework?flag=overdue" />
         <StatCard label="Waiting > 48 h for review" value={slow.length} href="/admin/homework?flag=slow" />
       </div>
@@ -73,7 +77,8 @@ export default async function AdminHomeworkPage({
           </Link>
         )}
       </form>
-      <HomeworkTable rows={rows} viewer="admin" tz={profile.timezone} waitingSince={waiting} empty="No homework matches." />
+      <HomeworkTable rows={list.rows} viewer="admin" tz={profile.timezone} waitingSince={waiting} empty="No homework matches." />
+      <Pager {...list} base="/admin/homework" params={{ teacher: sp.teacher, student: sp.student, status: sp.status, flag: sp.flag }} />
     </>
   );
 }

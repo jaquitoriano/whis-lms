@@ -6,19 +6,19 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 
 const env = Object.fromEntries(
-  readFileSync(".env.local", "utf8")
+  readFileSync(process.env.ENV_FILE ?? ".env.local", "utf8")
     .split(/\r?\n/)
     .filter(Boolean)
     .map((l) => l.split(/=(.*)/s).slice(0, 2)),
 );
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
-if (!/127\.0\.0\.1|localhost/.test(env.NEXT_PUBLIC_SUPABASE_URL)) throw new Error("Smoke tests run against the local database only");
+if (!/127\.0\.0\.1|localhost/.test(env.NEXT_SUPABASE_URL)) throw new Error("Smoke tests run against the local database only");
 
 async function cookieFor(email) {
-  const c = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+  const c = createClient(env.NEXT_SUPABASE_URL, env.NEXT_SUPABASE_ANON_KEY, { auth: { persistSession: false } });
   const { data, error } = await c.auth.signInWithPassword({ email, password: "Password123!" });
   if (error) throw error;
-  const ref = new URL(env.NEXT_PUBLIC_SUPABASE_URL).hostname.split(".")[0];
+  const ref = new URL(env.NEXT_SUPABASE_URL).hostname.split(".")[0];
   const val = "base64-" + Buffer.from(JSON.stringify(data.session)).toString("base64url");
   const parts = [];
   for (let i = 0; i < val.length; i += 3180) parts.push(val.slice(i, i + 3180));
@@ -38,7 +38,6 @@ const ANA = "00000000-0000-4000-a000-000000000022";
 const HW1 = "30000000-0000-4000-a000-000000000001"; // Kenji, completed after a revision
 const HW2 = "30000000-0000-4000-a000-000000000002"; // Kenji, submitted, waiting for review
 const HW3 = "30000000-0000-4000-a000-000000000003"; // Kenji, open
-const HW4 = "30000000-0000-4000-a000-000000000004"; // Min-jun, overdue
 
 const mustHave = [
   ["admin@school.test", "/admin", ["Classes today", "Past classes not closed", "Students without a teacher"]],
@@ -54,7 +53,7 @@ const mustHave = [
   ["teacher1@school.test", "/teacher/calendar?view=week", ["Asia/Manila", "09:00–18:00", "Kenji Tanaka"]],
   ["teacher1@school.test", "/teacher/calendar?view=month", ["Kenji Tanaka"]],
   ["teacher1@school.test", "/teacher/calendar/new", ["Schedule a class", "Kenji Tanaka", "Repeat weekly"]],
-  ["teacher1@school.test", `/teacher/classes/${S3}`, ["Mark completed", "Cambridge IELTS 18", "youtube-nocookie.com/embed/", "1. Previous lesson", "Visible to student", "Private notes", "Asia/Tokyo"]],
+  ["teacher1@school.test", `/teacher/classes/${S3}`, ["Mark completed", "Cambridge IELTS 18", "i.ytimg.com/vi/", "1. Previous lesson", "Visible to student", "Private notes", "Asia/Tokyo"]],
   ["teacher1@school.test", "/teacher/availability", ["Weekly teaching hours", "Training day"]],
   ["teacher1@school.test", "/teacher/lessons", ["Lesson records", "Kenji Tanaka"]],
   ["teacher1@school.test", `/teacher/students/${KENJI}`, ["Lesson history", "Upcoming classes"]],
@@ -84,6 +83,21 @@ const mustHave = [
   ["student1@school.test", "/student/calendar?view=month", ["Due "]],
   ["admin@school.test", "/admin/homework", ["Homework monitoring", "Overdue (required)", "Past simple practice"]],
   ["admin@school.test", `/admin/homework/${HW1}`, ["Submission history", "Band 6.5"]],
+  ["admin@school.test", "/admin/announcements", ["New announcement", "Holiday schedule"]],
+  ["admin@school.test", "/admin/policies", ["Acceptance of version", "Min-jun Park", "Publish new version"]],
+  ["admin@school.test", "/admin/audit", ["Audit log", "Student assigned to teacher"]],
+  ["admin@school.test", "/admin/account", ["Change password"]],
+  ["admin@school.test", "/admin", ["Students yet to accept policies", "Full audit log"]],
+  ["teacher1@school.test", "/teacher/notifications", ["Notifications", "new classes assigned"]],
+  ["teacher1@school.test", "/teacher/settings", ["Email notifications", "A student submitted homework", "Change password"]],
+  ["teacher1@school.test", "/teacher/announcements", ["Holiday schedule"]],
+  ["teacher1@school.test", "/teacher/policies", ["Cancelling or rescheduling"]],
+  ["teacher1@school.test", "/teacher", ["Announcements", "Holiday schedule", "Notifications, "]],
+  ["student1@school.test", "/student/notifications", ["new classes scheduled"]],
+  ["student1@school.test", "/student/settings", ["Homework checked by my teacher"]],
+  ["student1@school.test", "/student/policies", ["You accepted these policies"]],
+  ["student1@school.test", "/student", ["Holiday schedule"]],
+  ["student3@school.test", "/accept-policies", ["Please read them and confirm", "Accept and continue"]],
 ];
 const refused = [
   ["teacher1@school.test", `/teacher/students/${ANA}`, (r) => r.status === 404, "teacher opening another teacher's student -> 404"],
@@ -91,6 +105,9 @@ const refused = [
   ["student1@school.test", `/student/classes/${S7}`, (r) => r.status === 404, "student opening another student's class -> 404"],
   ["student1@school.test", "/admin", (r) => r.status === 307 && r.loc.includes("/student"), "student opening /admin -> redirected"],
   ["teacher1@school.test", "/admin/users", (r) => r.status === 307 && r.loc.includes("/teacher"), "teacher opening admin -> redirected"],
+  ["student3@school.test", "/student/homework", (r) => r.status === 307 && r.loc.endsWith("/accept-policies"), "student who hasn't accepted policies is sent to them"],
+  ["student3@school.test", "/student", (r) => r.status === 307 && r.loc.endsWith("/accept-policies"), "...from the dashboard too"],
+  ["student1@school.test", "/accept-policies", (r) => r.status === 307 && r.loc.endsWith("/student"), "students who already accepted skip the gate"],
   ["student2@school.test", `/student/homework/${HW1}`, (r) => r.status === 404, "student opening another student's homework -> 404"],
   ["teacher2@school.test", `/teacher/homework/${HW1}`, (r) => r.status === 404, "teacher opening another teacher's homework -> 404"],
 ];
@@ -98,6 +115,7 @@ const mustNotHave = [
   ["student1@school.test", `/student/classes/${S3}`, ["Mark completed", "Private notes", "Upload file"], "student class page has no edit controls"],
   ["teacher1@school.test", `/teacher/classes/${S3}`, ["Teacher absent"], "teacher can't mark teacher absent"],
   ["admin@school.test", `/admin/homework/${HW2}`, ["Request revision", "Upload corrected file", "Withdraw"], "admin homework view is read-only"],
+  ["teacher1@school.test", "/teacher/policies", ["Accept and continue"], "teachers aren't asked to accept"],
   ["student1@school.test", `/student/homework/${HW2}`, ["Request revision", "Submit homework"], "student can't review or resubmit while under review"],
 ];
 
@@ -123,6 +141,17 @@ for (const [u, p, bad, label] of mustNotHave) {
   const ok = r.status === 200 && !found.length;
   if (!ok) fail++;
   console.log(ok ? "PASS" : "FAIL", label, ok ? "" : `status=${r.status} found=${JSON.stringify(found)}`);
+}
+// The middleware no longer calls the auth server, so the portal layouts must reject a forged session.
+{
+  const forged = "base64-" + Buffer.from(JSON.stringify({ access_token: "forged.token.value", refresh_token: "forged", expires_at: 4102444800, token_type: "bearer", user: { id: KENJI, role: "authenticated" } })).toString("base64url");
+  const ref = new URL(env.NEXT_SUPABASE_URL).hostname.split(".")[0];
+  for (const p of ["/student", "/teacher", "/admin", `/student/classes/${S3}`]) {
+    const r = await get(`sb-${ref}-auth-token=${forged}`, p);
+    const ok = r.status === 307 && /\/login/.test(r.loc ?? "") && !r.body;
+    if (!ok) fail++;
+    console.log(ok ? "PASS" : "FAIL", "forged session cookie refused on", p, ok ? "" : `status=${r.status} ${r.loc ?? ""}`);
+  }
 }
 console.log(fail ? `${fail} failed` : "all passed");
 process.exit(fail ? 1 : 0);

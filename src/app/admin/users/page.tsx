@@ -1,6 +1,6 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { requireRole } from "@/lib/auth";
-import { Avatar, EmptyState, PageHeader, StatusBadge, formatDate } from "@/components/ui";
+import { Avatar, EmptyState, PageHeader, Pager, StatusBadge, formatDate, paginate } from "@/components/ui";
 import type { Profile } from "@/lib/types";
 
 export const metadata = { title: "Users" };
@@ -10,7 +10,7 @@ const titles = { teacher: "Teachers", student: "Students", admin: "Administrator
 export default async function UsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ role?: string; status?: string; q?: string; filter?: string }>;
+  searchParams: Promise<{ role?: string; status?: string; q?: string; filter?: string; page?: string }>;
 }) {
   const { supabase } = await requireRole("admin");
   const sp = await searchParams;
@@ -31,6 +31,7 @@ export default async function UsersPage({
     teacherOfStudent.add(l.student_id);
   }
   if (sp.filter === "unassigned") users = users.filter((u) => u.role === "student" && !teacherOfStudent.has(u.id));
+  const list = paginate(users, sp.page);
 
   return (
     <>
@@ -57,7 +58,7 @@ export default async function UsersPage({
         </button>
       </form>
 
-      {users.length === 0 ? (
+      {list.total === 0 ? (
         <EmptyState>No users match.</EmptyState>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-surface">
@@ -73,7 +74,7 @@ export default async function UsersPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {users.map((u) => (
+              {list.rows.map((u) => (
                 <tr key={u.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <Link href={`/admin/users/${u.id}${role ? `?role=${role}` : ""}`} className="flex items-center gap-3 font-medium hover:text-brand-700">
@@ -104,6 +105,7 @@ export default async function UsersPage({
           </table>
         </div>
       )}
+      <Pager {...list} base="/admin/users" params={{ role: sp.role, status: sp.status, q: sp.q, filter: sp.filter }} />
     </>
   );
 }
