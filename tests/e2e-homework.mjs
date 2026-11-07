@@ -45,7 +45,8 @@ async function login(browser, email, home) {
 }
 const body = (p) => p.textContent("main");
 
-const browser = await chromium.launch();
+// CHROMIUM_PATH: use an already-installed Chromium when the matching Playwright build can't be downloaded.
+const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 let hwId = null;
 try {
   const t = await login(browser, "teacher1@school.test", "/teacher");

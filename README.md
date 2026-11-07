@@ -17,6 +17,22 @@ Stack: Next.js 16 (App Router, TypeScript, Tailwind) and Supabase (Postgres with
 | 6 | Progress and IELTS reports, messaging | Next |
 | 7 | Recordings, Zoom/Meet connection, advanced reports | Planned (shown as "coming soon" in the portals) |
 
+## First-time setup (Fedora Linux)
+
+Uses rootless Podman, which Fedora ships, instead of Docker Desktop.
+
+1. Turn on Podman's Docker-compatible socket (once per device; it then starts at every login):
+   `systemctl --user enable --now podman.socket`
+2. Install packages: `npm install`
+3. Start the local database: `npm run db:start`. The `db:*` scripts find the Podman socket themselves. To run `npx supabase` directly instead, first set
+   `export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock` (put it in `~/.bashrc.d/` to keep it).
+4. Steps 4–6 of the Windows setup below: `.env.local`, `npm run db:reset`, `npm run dev`.
+5. Browser tests: `npx playwright install chromium`. Fedora isn't officially supported, so Playwright downloads an Ubuntu build. If the download stalls, point the tests at a Chromium you already have:
+   `CHROMIUM_PATH=/path/to/chrome npm run test:e2e:phase5`. Missing system libraries: see the Fedora section of the ccsp README.
+6. `test:e2e:phase4` cleans up with `docker exec`, or `podman exec` when Docker isn't installed.
+
+Known Podman quirks: `npm run db:stop` prints "failed to prune volumes", which is harmless. If `db:reset` fails right after a restart that restored a backup, run `npm run db:stop -- --no-backup`, remove the volumes with `podman volume ls --filter label=com.supabase.cli.project=english-ielts-lms -q | xargs podman volume rm`, and run `npm run db:start` again (this deletes local test data only).
+
 ## First-time setup (Windows)
 
 1. **Docker Desktop** needs WSL 2. In an admin PowerShell run `wsl --install --no-distribution`, restart the PC, then open Docker Desktop once and wait until it says "Engine running".

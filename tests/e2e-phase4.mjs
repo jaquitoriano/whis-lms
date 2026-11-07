@@ -39,10 +39,20 @@ async function login(browser, email) {
 const main = (p) => p.textContent("main");
 const bellCount = async (p) => Number((await p.getAttribute("a[aria-label^='Notifications']", "aria-label")).match(/(\d+) unread/)?.[1] ?? 0);
 // Remove rows that triggers deliberately protect (published policies), for test cleanup only.
+// Docker, or Podman where Docker isn't installed (e.g. Fedora).
+const containerCli = (() => {
+  try {
+    execFileSync("docker", ["--version"], { stdio: "ignore" });
+    return "docker";
+  } catch {
+    return "podman";
+  }
+})();
 const psql = (sql) =>
-  execFileSync("docker", ["exec", "supabase_db_english-ielts-lms", "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", sql], { stdio: "pipe" });
+  execFileSync(containerCli, ["exec", "supabase_db_english-ielts-lms", "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", sql], { stdio: "pipe" });
 
-const browser = await chromium.launch();
+// CHROMIUM_PATH: use an already-installed Chromium when the matching Playwright build can't be downloaded.
+const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 let announcementId = null;
 let publishedV2 = false;
 try {

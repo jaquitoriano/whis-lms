@@ -16,7 +16,8 @@ const B = "http://localhost:3000";
 const results = []; const ok = (name, cond, extra="") => { results.push([cond, name]); console.log(cond ? "PASS" : "FAIL", name, cond ? "" : extra); };
 const d = new Date(Date.now() + 5*86400000); const date = new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(d);
 writeFileSync(TMP_PDF, "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF");
-const browser = await chromium.launch();
+// CHROMIUM_PATH: use an already-installed Chromium when the matching Playwright build can't be downloaded.
+const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 async function pick(pg, text) { const v = await pg.$$eval("#pair option", (os, t) => os.find((o) => o.textContent.includes(t))?.value, text); await pg.selectOption("#pair", v); }
 const created = [];
 try {
