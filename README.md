@@ -19,19 +19,21 @@ Stack: Next.js 16 (App Router, TypeScript, Tailwind) and Supabase (Postgres with
 
 ## First-time setup (Fedora Linux)
 
-Uses rootless Podman, which Fedora ships, instead of Docker Desktop.
+Uses Docker Engine with the Docker Compose plugin.
 
-1. Turn on Podman's Docker-compatible socket (once per device; it then starts at every login):
-   `systemctl --user enable --now podman.socket`
+1. Install Docker (once per device):
+   ```bash
+   sudo dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo
+   sudo dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+   sudo systemctl enable --now docker
+   sudo usermod -aG docker $USER
+   ```
+   When asked to import Docker's signing key, check that its fingerprint is `060A 61C5 1B55 8A7F 742B 77AA C52F EB6B 621E 9F35`. Then log out and back in, so `docker` works without `sudo`. Being in the `docker` group gives root-level access to the machine, so add only trusted accounts.
 2. Install packages: `npm install`
-3. Start the local database: `npm run db:start`. The `db:*` scripts find the Podman socket themselves. To run `npx supabase` directly instead, first set
-   `export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock` (put it in `~/.bashrc.d/` to keep it).
+3. Start the local database: `npm run db:start` (the first run downloads images, ~5 min).
 4. Steps 4–6 of the Windows setup below: `.env.local`, `npm run db:reset`, `npm run dev`.
 5. Browser tests: `npx playwright install chromium`. Fedora isn't officially supported, so Playwright downloads an Ubuntu build. If the download stalls, point the tests at a Chromium you already have:
    `CHROMIUM_PATH=/path/to/chrome npm run test:e2e:phase5`. Missing system libraries: see the Fedora section of the ccsp README.
-6. `test:e2e:phase4` cleans up with `docker exec`, or `podman exec` when Docker isn't installed.
-
-Known Podman quirks: `npm run db:stop` prints "failed to prune volumes", which is harmless. If `db:reset` fails right after a restart that restored a backup, run `npm run db:stop -- --no-backup`, remove the volumes with `podman volume ls --filter label=com.supabase.cli.project=english-ielts-lms -q | xargs podman volume rm`, and run `npm run db:start` again (this deletes local test data only).
 
 ## First-time setup (Windows)
 
