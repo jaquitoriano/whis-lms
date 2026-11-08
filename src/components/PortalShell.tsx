@@ -7,7 +7,20 @@ import { MobileMenu } from "@/components/MobileMenu";
 import { NotificationBell } from "@/components/portal/NotificationBell";
 import type { Profile } from "@/lib/types";
 
-export type NavItem = { href: string; label: string; phase?: number };
+export type NavItem = { href: string; label: string; phase?: number; badge?: number };
+
+// Menu label with an optional unread count (Messages).
+function NavLabel({ item }: { item: NavItem }) {
+  if (!item.badge) return <>{item.label}</>;
+  return (
+    <span className="flex items-center justify-between gap-2">
+      {item.label}
+      <span className="min-w-5 rounded-full bg-brand-600 px-1.5 text-center text-[11px] font-semibold leading-5 text-white" aria-label={`${item.badge} unread`}>
+        {item.badge > 99 ? "99+" : item.badge}
+      </span>
+    </span>
+  );
+}
 
 // Shared layout for the admin, teacher and student portals.
 // Items with a `phase` are shown as "coming soon" so users can see what's planned.
@@ -42,7 +55,7 @@ export function PortalShell({
         <nav aria-label="Portal" className="flex flex-col gap-1 px-2 pb-3">
           {live.map((n) => (
             <NavLink key={n.href} href={n.href}>
-              {n.label}
+              <NavLabel item={n} />
             </NavLink>
           ))}
           {soon.length > 0 && <p className="px-3 pb-1 pt-4 text-xs font-medium uppercase tracking-wide text-muted">Coming soon</p>}
@@ -69,7 +82,7 @@ export function PortalShell({
               <p className="px-3 pb-1 pt-1 text-xs font-medium uppercase tracking-wide text-muted">{roleLabel} menu</p>
               {live.map((n) => (
                 <NavLink key={n.href} href={n.href}>
-                  {n.label}
+                  <NavLabel item={n} />
                 </NavLink>
               ))}
               {soon.length > 0 && <p className="px-3 pb-1 pt-4 text-xs font-medium uppercase tracking-wide text-muted">Coming soon</p>}

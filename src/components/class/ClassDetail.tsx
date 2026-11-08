@@ -15,6 +15,7 @@ import { formatDateTime, minutesBetween, toDateStr, toTimeStr, tzLabel } from "@
 import { listHomework } from "@/lib/homework";
 import { HomeworkStatusBadges } from "@/components/homework/HomeworkTable";
 import { addMaterialLink, addVideo, deleteMaterial, deleteVideo, updateMeetingLink } from "@/lib/session-actions";
+import { openConversation } from "@/lib/message-actions";
 import type { Profile } from "@/lib/types";
 
 type Material = {
@@ -150,6 +151,15 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
             </a>
           )}
           {!s.meeting_url && active && <p className="text-sm text-muted">The meeting link will appear here.</p>}
+          {/* MSG-01: class-linked conversation, for the class's own teacher and student. */}
+          {(isOwnerTeacher || (isStudent && s.student_id === viewer.id)) && (
+            <form action={openConversation}>
+              <input type="hidden" name="session" value={id} />
+              <SubmitButton className="btn-secondary" pendingText="Opening…">
+                Message about this class
+              </SubmitButton>
+            </form>
+          )}
         </div>
 
         {canManage && (

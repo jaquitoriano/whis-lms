@@ -245,3 +245,57 @@ insert into public.payments (invoice_id, student_id, amount, method, reference, 
   ('50000000-0000-4000-a000-000000000001', '00000000-0000-4000-a000-000000000021', 6000, 'bank_transfer', 'BDO 88231', current_date - 28, '00000000-0000-4000-a000-000000000001'),
   ('50000000-0000-4000-a000-000000000002', '00000000-0000-4000-a000-000000000022', 7500, 'gcash', 'GC 1093-2281', current_date - 19, '00000000-0000-4000-a000-000000000001');
 
+
+-- ---------------------------------------------------------------------------
+-- Phase 6 sample progress, IELTS results and messages. No new classes, so the Phase 5
+-- package and pay numbers stay the same.
+-- ---------------------------------------------------------------------------
+-- Kenji (IELTS, Maria): two published monthly reports, B1+ -> B2.
+insert into public.progress_reports (id, student_id, author_id, period_start, period_end, speaking, listening, reading, writing, grammar, vocabulary, pronunciation, fluency, overall,
+  summary, strengths, next_goals, status, published_at) values
+  ('60000000-0000-4000-a000-000000000001', '00000000-0000-4000-a000-000000000021', '00000000-0000-4000-a000-000000000011', current_date - 68, current_date - 39,
+   3.5, 4, 4, 3, 3.5, 3.5, 4, 3.5, 3.5,
+   'Kenji has settled in well and works hard between classes. His reading and listening are already at B2; writing is the skill holding his band back.',
+   'Reading for detail; clear pronunciation; always does his homework.',
+   'Plan Task 2 essays before writing. Learn 10 topic words a week. Speak for the full 2 minutes in Part 2.',
+   'published', now() - interval '38 days'),
+  ('60000000-0000-4000-a000-000000000002', '00000000-0000-4000-a000-000000000021', '00000000-0000-4000-a000-000000000011', current_date - 38, current_date - 8,
+   4, 4.5, 4, 4, 3.5, 4, 4, 4, 4,
+   'A strong month. Kenji''s essays now have a clear position and good linking, and his second mock test reached band 6.5.',
+   'Essay structure; confident Speaking Part 2; much wider topic vocabulary.',
+   'Accuracy with articles and agreement ("I agree", not "I am agree"). Speaking Part 3: give reasons and examples.',
+   'published', now() - interval '7 days');
+
+-- Ana (Business English, James): one report. Min-jun (Maria): a draft the student can't see yet.
+insert into public.progress_reports (id, student_id, author_id, period_start, period_end, speaking, listening, reading, writing, grammar, vocabulary, pronunciation, fluency, overall,
+  summary, strengths, next_goals, status, published_at) values
+  ('60000000-0000-4000-a000-000000000003', '00000000-0000-4000-a000-000000000022', '00000000-0000-4000-a000-000000000012', current_date - 30, current_date - 2,
+   3, 3.5, 3.5, 3, 3, 3.5, 3.5, 3, 3,
+   'Ana communicates clearly in meeting role-plays and is quick to use new phrases.',
+   'Meeting language; listening to fast speech.',
+   'Formal emails: openings, closings and polite requests.',
+   'published', now() - interval '1 day'),
+  ('60000000-0000-4000-a000-000000000004', '00000000-0000-4000-a000-000000000023', '00000000-0000-4000-a000-000000000011', current_date - 20, current_date,
+   2, 2, null, 1.5, 2, 2, null, 2, 2,
+   'Min-jun is gaining confidence.', '', '',
+   'draft', null);
+
+-- Kenji's IELTS history: diagnostic 5.5, mocks 6.0 and 6.5, and a writing-only practice test.
+insert into public.ielts_results (id, student_id, kind, module, test_date, listening, reading, writing, speaking, notes, recorded_by) values
+  ('61000000-0000-4000-a000-000000000001', '00000000-0000-4000-a000-000000000021', 'diagnostic', 'academic', current_date - 65, 5.5, 6, 5, 5.5, 'Placement test on enrolment.', '00000000-0000-4000-a000-000000000011'),
+  ('61000000-0000-4000-a000-000000000002', '00000000-0000-4000-a000-000000000021', 'mock', 'academic', current_date - 37, 6, 6, 5.5, 6, 'Cambridge IELTS 17, Test 1.', '00000000-0000-4000-a000-000000000011'),
+  ('61000000-0000-4000-a000-000000000003', '00000000-0000-4000-a000-000000000021', 'mock', 'academic', current_date - 9, 6.5, 6.5, 6, 6.5, 'Cambridge IELTS 18, Test 1. Task 2 was the weakest part.', '00000000-0000-4000-a000-000000000011'),
+  ('61000000-0000-4000-a000-000000000004', '00000000-0000-4000-a000-000000000021', 'mock', 'academic', current_date - 2, null, null, 6.5, null, 'Writing practice test only.', '00000000-0000-4000-a000-000000000011');
+insert into public.ielts_goals (student_id, target_overall, exam_date, updated_by) values
+  ('00000000-0000-4000-a000-000000000021', 7, current_date + 75, '00000000-0000-4000-a000-000000000011');
+
+-- Maria and Kenji: a general conversation (Kenji has one unread message) and one about the next
+-- class (Maria has one unread).
+insert into public.message_threads (id, kind, teacher_id, student_id, session_id, created_by, created_at) values
+  ('62000000-0000-4000-a000-000000000001', 'general', '00000000-0000-4000-a000-000000000011', '00000000-0000-4000-a000-000000000021', null, '00000000-0000-4000-a000-000000000011', now() - interval '3 days'),
+  ('62000000-0000-4000-a000-000000000002', 'class', '00000000-0000-4000-a000-000000000011', '00000000-0000-4000-a000-000000000021', '20000000-0000-4000-a000-000000000003', '00000000-0000-4000-a000-000000000021', now() - interval '3 hours');
+insert into public.messages (thread_id, sender_id, body, created_at) values
+  ('62000000-0000-4000-a000-000000000001', '00000000-0000-4000-a000-000000000011', E'Hi Kenji, well done on the second version of your essay. The structure is much clearer now.', now() - interval '2 days 3 hours'),
+  ('62000000-0000-4000-a000-000000000001', '00000000-0000-4000-a000-000000000021', E'Thank you! Should I write another Task 2 essay this week?', now() - interval '2 days 1 hour'),
+  ('62000000-0000-4000-a000-000000000001', '00000000-0000-4000-a000-000000000011', E'Yes, one essay on the environment topic. Keep it under 40 minutes.', now() - interval '1 day'),
+  ('62000000-0000-4000-a000-000000000002', '00000000-0000-4000-a000-000000000021', E'Will we practise Speaking Part 3 in this class? I watched the video.', now() - interval '3 hours');

@@ -8,6 +8,9 @@ import { SessionList } from "@/components/class/SessionList";
 import { HomeworkTable } from "@/components/homework/HomeworkTable";
 import { listHomework } from "@/lib/homework";
 import { AnnouncementsPanel } from "@/components/portal/Announcements";
+import { getProgressDue } from "@/lib/progress";
+import { unreadMessageCount } from "@/lib/messages";
+import { formatPlainDate } from "@/lib/progress-shared";
 import { Avatar, PageHeader, StatCard } from "@/components/ui";
 
 export const metadata = { title: "Teacher dashboard" };
@@ -16,13 +19,18 @@ export default async function TeacherDashboard() {
   const { supabase, profile } = await requireRole("teacher");
   const tz = profile.timezone;
   const today = todayStr(tz);
-  const [students, todays, upcoming, history, toReview] = await Promise.all([
+  const [students, todays, upcoming, history, toReview, due, unread] = await Promise.all([
     getMyStudents(supabase, profile.id),
     getSessions(supabase, { from: zonedToUtc(today, "00:00", tz), to: zonedToUtc(addDays(today, 1), "00:00", tz), teacherId: profile.id }),
     getSessions(supabase, { from: zonedToUtc(addDays(today, 1), "00:00", tz), to: zonedToUtc(addDays(today, 8), "00:00", tz), teacherId: profile.id }),
     getLessonHistory(supabase, { teacherId: profile.id, limit: 50 }),
     listHomework(supabase, { teacherId: profile.id, statuses: ["submitted", "under_review"] }),
+    getProgressDue(supabase),
+    unreadMessageCount(supabase),
   ]);
+  const dueStudents = due
+    .map((d) => ({ ...d, student: students.find((s) => s.student.id === d.student_id)?.student }))
+    .filter((d) => d.student);
   const todayActive = todays.filter((s) => s.status !== "cancelled" && s.status !== "rescheduled");
   const upcomingActive = upcoming.filter((s) => s.status === "scheduled");
   const needsNotes = history.filter(
@@ -40,13 +48,19 @@ export default async function TeacherDashboard() {
           </Link>
         }
       />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
         <StatCard label="Today's classes" value={todayActive.length} href={`/teacher/calendar?view=day&date=${today}`} />
         <StatCard label="Next 7 days" value={upcomingActive.length} href="/teacher/calendar" />
         <StatCard label="Assigned students" value={students.length} href="/teacher/students" />
         <StatCard label="Classes needing notes" value={needsNotes.length} href="/teacher/lessons" />
         <StatCard label="Homework to review" value={toReview.length} href="/teacher/homework" />
+        <StatCard label="Progress reports due" value={dueStudents.length} href="/teacher/progress" />
       </div>
+      {unread > 0 && (
+        <Link href="/teacher/messages" className="mt-4 block rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-700 hover:bg-brand-100">
+          You have unread messages in {unread} conversation{unread > 1 ? "s" : ""} →
+        </Link>
+      )}
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="card">
@@ -87,6 +101,23 @@ export default async function TeacherDashboard() {
             </ul>
           )}
         </section>
+        {dueStudents.length > 0 && (
+          <section className="card border-amber-200">
+            <h2 className="mb-1 font-semibold">Due a progress report</h2>
+            <p className="mb-2 text-sm text-muted">More than a month of classes since their last report (PRG-02).</p>
+            <ul className="divide-y divide-border text-sm">
+              {dueStudents.slice(0, 6).map((d) => (
+                <li key={d.student_id}>
+                  <Link href={`/teacher/progress/${d.student_id}`} className="flex items-center gap-3 py-2 hover:text-brand-700">
+                    <Avatar profile={d.student!} size={32} />
+                    <span className="flex-1">{d.student!.full_name}</span>
+                    <span className="text-xs text-muted">classes since {formatPlainDate(d.since)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <section className="lg:col-span-2">
           <h2 className="mb-2 font-semibold">Homework to review</h2>
           <HomeworkTable rows={toReview.slice(0, 6)} viewer="teacher" tz={tz} empty="Nothing waiting for review." />

@@ -13,6 +13,13 @@ const label: Record<string, string> = {
   "session.status": "Class status changed",
   "homework.status": "Homework status changed",
   "policy.publish": "Class policies published",
+  "progress.publish": "Progress report published",
+  "progress.edit": "Published progress report corrected",
+  "progress.delete": "Published progress report removed",
+  "ielts.insert": "IELTS result added",
+  "ielts.update": "IELTS result changed",
+  "ielts.delete": "IELTS result removed",
+  "messages.view": "Admin read a conversation",
 };
 const groups = [
   { key: "", label: "All" },
@@ -21,6 +28,9 @@ const groups = [
   { key: "session", label: "Classes" },
   { key: "homework", label: "Homework" },
   { key: "policy", label: "Policies" },
+  { key: "progress", label: "Progress reports" },
+  { key: "ielts", label: "IELTS results" },
+  { key: "messages", label: "Message access" },
 ];
 
 function entityLink(entity: string, id: string) {
@@ -29,6 +39,8 @@ function entityLink(entity: string, id: string) {
   if (entity === "homework_assignments") return `/admin/homework/${id}`;
   if (entity === "policies") return "/admin/policies";
   if (entity === "teacher_students") return `/admin/users/${id.split(":")[1]}`;
+  if (entity === "progress_reports") return `/admin/progress/reports/${id}`;
+  if (entity === "message_threads") return `/admin/messages/${id}`;
   return null;
 }
 

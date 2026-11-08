@@ -297,6 +297,21 @@ async function StudentSection({ id }: { id: string }) {
       </section>
 
       <StudentPackages supabase={supabase} studentId={id} />
+
+      <section className="card lg:col-span-2 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-semibold">Progress and messages</h2>
+          <p className="text-sm text-muted">Progress reports, IELTS results and the student&apos;s conversations with teachers.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/admin/progress/${id}`} className="btn-secondary">
+            Progress
+          </Link>
+          <Link href={`/admin/messages?student=${id}`} className="btn-secondary">
+            Messages
+          </Link>
+        </div>
+      </section>
     </>
   );
 }
