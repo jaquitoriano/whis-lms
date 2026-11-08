@@ -47,3 +47,7 @@ supabase/.branches
 
 .vercel
 .env*
+
+# agent
+qa/
+perf/
