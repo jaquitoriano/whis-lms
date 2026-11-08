@@ -8,6 +8,7 @@ import { MaterialUploader } from "./MaterialUploader";
 import { YouTubePlayer } from "./YouTubePlayer";
 import { StatusPanel } from "./StatusPanel";
 import { AttendancePanel } from "./AttendancePanel";
+import { RecordingsPanel } from "./RecordingsPanel";
 import { getBillingSettings } from "@/lib/billing";
 import { getSession, statusLabel, statusStyle, classPath } from "@/lib/sessions";
 import { LESSON_SECTIONS, type LessonRecord } from "@/lib/lesson-fields";
@@ -203,6 +204,15 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
           enrollment_id: s.enrollment_id,
           enrollments: (enrollments ?? []).map((e) => ({ id: e.id, label: `${e.package_name} (from ${e.starts_on}${e.status !== "active" ? `, ${e.status}` : ""})` })),
         }}
+      />
+
+      <RecordingsPanel
+        supabase={supabase}
+        sessionId={id}
+        canManage={canManage}
+        isStudent={isStudent}
+        sharedByDefault={canManage ? (await supabase.rpc("setting_bool", { p_key: "recordings_visible_by_default" })).data !== false : true}
+        classOver={s.status === "completed"}
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

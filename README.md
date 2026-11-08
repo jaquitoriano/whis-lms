@@ -15,7 +15,8 @@ Stack: Next.js 16 (App Router, TypeScript, Tailwind) and Supabase (Postgres with
 | 4.5 | Phone layouts and menu, upload progress and upload fix, fewer background requests, faster queries, long lists split into pages, homework counts no longer hidden by old work | Done |
 | 5 | Class packages, attendance, enrollment contracts with e-signing (student in the portal, guardian by email link), invoices, payments, receipts, monthly statements, PDFs, teacher pay | Done |
 | 6 | Monthly progress reports (CEFR levels per skill), IELTS results with the overall band worked out by the database, target band and exam date, band and level charts, "due a report" reminders, teacher–student messaging with attachments (general and per class), admin read-only view of messages | Done |
-| 7 | Recordings, Zoom/Meet connection, advanced reports | Planned (shown as "coming soon" in the portals) |
+| 7a | Class recording links with per-recording sharing (admin default), admin reports (month by month, teachers, students who need a look) with CSV downloads, notification job every 15 minutes from Supabase | Done |
+| 7b | Zoom / Google Meet connection (automatic meeting and recording links), other messaging channels (WhatsApp, LINE, Viber) | Waiting for the platform choice and accounts |
 
 ## First-time setup (Fedora Linux)
 
@@ -56,7 +57,7 @@ Local extras: Supabase Studio (database browser) at http://127.0.0.1:54323, and 
 - Notifications are created by the database the moment something happens (class booked, cancelled or moved; homework set, submitted or reviewed; lesson notes shared; materials added; announcements; policy updates).
 - Time-based ones (class reminders 24 h and 1 h before, homework due within 24 h, teachers' daily "waiting more than 48 h" reminder, announcements scheduled for later) and **all emails** are handled by a job at `/api/cron/notifications`.
 - Locally, run it with `npm run notify`. In production, `vercel.json` schedules it every 15 minutes (on Vercel's free plan crons run at most daily, so use the Pro plan or any external scheduler that calls the URL with `Authorization: Bearer <CRON_SECRET>`).
-- Production email: set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `EMAIL_FROM` for your provider (e.g. Resend), plus a long random `CRON_SECRET`.
+- Production email: set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` and `NEXT_SITE_URL` (the live address, used in email links) for your provider (e.g. Resend), plus a long random `CRON_SECRET`. Supabase also calls the job every 15 minutes (see Phase 7 decisions), so the Vercel plan doesn't matter.
 
 ## Test accounts (local only)
 
@@ -99,17 +100,27 @@ Run it after every database change.
 
 | Command | What it checks | Needs |
 |---|---|---|
-| `npm run test:rls` | 61 database rules: privacy (who can see and change what), double-booking, private files, homework workflow, notifications, announcements, policies, Phase 5 (billing privacy, invoice totals and balances, no overpaying, void instead of delete, package usage, attendance, contract signing, teacher pay) and Phase 6 (report and score privacy, draft → published, IELTS band rounding, who is due a report, who can read and write each conversation, attachments, admin audit). The files run one after another, because some tests briefly change shared data | local database |
+| `npm run test:rls` | 67 database rules: privacy (who can see and change what), double-booking, private files, homework workflow, notifications, announcements, policies, Phase 5 (billing privacy, invoice totals and balances, no overpaying, void instead of delete, package usage, attendance, contract signing, teacher pay) and Phase 6 (report and score privacy, draft → published, IELTS band rounding, who is due a report, who can read and write each conversation, attachments, admin audit) and Phase 7 (who can add, share and see recordings, the sharing default, reports for admins only, report figures match the records). The files run one after another, because some tests briefly change shared data | local database |
 | `npm run test:smoke` | Every portal page renders the right content for each role, and other people's pages are refused | local database + `npm run dev` |
 | `npm run test:e2e` | Real browser walk-through: schedule, autosave notes, upload, YouTube, complete, student view, reschedule | local database + `npm run dev`; first run `npx playwright install chromium` |
 | `npm run test:e2e:homework` | Real browser walk-through of homework: assign, draft, photo upload, submit, review, revision, version 2, complete | same as above |
 | `npm run test:e2e:phase5` | Invoice → part payment → PDFs (invoice, receipt, statement), student's classes and payments page, student signs a contract, guardian signs from the emailed link, teacher marks late and records a late cancellation, access checks, phone layout | local database + running app (`npm run dev`); safe to repeat |
 | `npm run test:e2e:phase6` | Teacher writes, saves and publishes a progress report; adds and deletes an IELTS result (overall band shown while typing); chart readout; student sees report and notification; class conversation with a file, reply arriving without a reload; admin read-only view logged; phone layouts | local database + running app; safe to repeat |
+| `npm run test:e2e:phase7` | Teacher adds a recording without sharing it, student can't see it, teacher shares it, student opens it and is notified; admin reports with period switch and CSV download; phone layouts | local database + running app; safe to repeat |
 | `npm run test:e2e:phase4` | Announcement → bell → notification centre, email delivered to Mailpit, email settings, policy gate and acceptance, publishing a new policy version | same as above (also needs Docker for cleanup) |
 
 Run `npm run db:reset` first if you have changed data by hand: the tests expect the seed data.
 
 **The tests only run against a local database.** They read `.env.local` and refuse to start if it points anywhere else. If your `.env.local` points to a hosted project, keep the local settings in another file and name it for the tests and the app: `$env:ENV_FILE=".env.test"` for the tests (PowerShell), plus the same values as process variables for `npm run dev`, which take priority over `.env.local`.
+
+## Decisions made for Phase 7, part 1 (Nov 2026, change if needed)
+
+- **Recordings** (REC-01..02) are **links** to where Zoom or Google keep them, with an optional passcode. The school stores no video (VID-05). The class's teacher or an admin adds them on the class page; a class can have more than one.
+- **Sharing with the student** (OD-06): the starting choice comes from Website settings → "Share class recordings with students" (on). The teacher can share or stop sharing each recording. The student is notified the first time one is shared. Recordings live in their own table so a student can never read an unshared link.
+- Zoom and Google may delete recordings after a while (depends on the plan); students are told the link may expire.
+- **Reports** (admin → Reports) for the last 3, 6 or 12 months, in the school time zone: classes completed, hours, attendance, cancellations, homework, invoices and payments per month; per teacher: students, classes, hours, classes without notes, cancellations, homework, reviews and average review time, progress reports; and active students who need a look (nothing booked in 14 days, 2 or fewer classes left or no package, overdue invoice, 2+ overdue homework, report due). Every table downloads as CSV for Excel or Sheets.
+- **Scheduled job**: Supabase runs the notifications job every 15 minutes (`pg_cron` + `pg_net`), reading the address and secret from Supabase Vault (`notifications_cron_url`, `notifications_cron_secret`). Vercel's daily cron stays as a backup. Without the Vault entries (e.g. locally) nothing is called.
+- Not built yet (part 2): creating Zoom/Meet links automatically and attaching recordings automatically, and WhatsApp/LINE/Viber. Both need the school's accounts first.
 
 ## Decisions made for Phase 6 (Nov 2026, change if needed)
 
