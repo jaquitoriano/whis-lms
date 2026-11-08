@@ -125,6 +125,16 @@ const mustHave = [
   ["admin@school.test", `/admin/progress/reports/${R_ANA}`, ["Correct progress report", "Remove this report"]],
   ["admin@school.test", "/admin/messages", ["Maria Santos and Kenji Tanaka"]],
   ["admin@school.test", `/admin/messages/${T_GENERAL}`, ["reading this as the school office", "well done on the second version"]],
+  // Phase 7: recordings and reports
+  ["teacher1@school.test", `/teacher/classes/${S1}`, ["Recording", "Add recording", "Share with the student"]],
+  ["student1@school.test", `/student/classes/${S1}`, ["No recording has been shared for this class"]],
+  ["student1@school.test", "/student/settings", ["Class recording available"]],
+  ["admin@school.test", "/admin/settings", ["Share class recordings with students"]],
+  ["admin@school.test", "/admin/reports", ["Reports", "Classes completed", "Payments received", "Month by month", "Teachers", "Maria Santos", "Students who need a look", "Kenji Tanaka", "Download CSV"]],
+  ["admin@school.test", "/admin/reports?months=12", ["12 months"]],
+  ["admin@school.test", "/api/reports/monthly?months=3", ["Month,Classes completed,Hours taught"]],
+  ["admin@school.test", "/api/reports/teachers", ["Maria Santos"]],
+  ["admin@school.test", "/api/reports/attention", ["Kenji Tanaka,Maria Santos"]],
 ];
 const refused = [
   ["teacher1@school.test", `/teacher/students/${ANA}`, (r) => r.status === 404, "teacher opening another teacher's student -> 404"],
@@ -144,6 +154,10 @@ const refused = [
   ["student2@school.test", `/student/messages/${T_GENERAL}`, (r) => r.status === 404, "student opening another student's conversation -> 404"],
   ["student1@school.test", "/student/messages/00000000-0000-4000-a000-0000000000ff", (r) => r.status === 404, "unknown conversation -> 404"],
   ["student3@school.test", "/student/messages", (r) => r.status === 307 && r.loc.endsWith("/accept-policies"), "messages are behind the policy gate too"],
+  ["teacher1@school.test", "/api/reports/monthly", (r) => r.status === 404, "teachers can't download reports"],
+  ["student1@school.test", "/api/reports/attention", (r) => r.status === 404, "students can't download reports"],
+  ["admin@school.test", "/api/reports/nonsense", (r) => r.status === 404, "unknown report -> 404"],
+  ["teacher1@school.test", "/admin/reports", (r) => r.status === 307 && r.loc.includes("/teacher"), "teacher opening admin reports -> redirected"],
 ];
 const mustNotHave = [
   ["student1@school.test", `/student/classes/${S3}`, ["Mark completed", "Private notes", "Upload file"], "student class page has no edit controls"],
@@ -154,6 +168,8 @@ const mustNotHave = [
   ["student1@school.test", "/student/progress", ["Add a result", "Write progress report", "Min-jun", "Save target"], "student progress page is read-only and private"],
   ["admin@school.test", `/admin/messages/${T_GENERAL}`, ["message-body", "Attach files"], "admins can't post in conversations"],
   ["teacher1@school.test", "/teacher", ["Coming soon"], "no Phase 6 items left under Coming soon for teachers"],
+  ["admin@school.test", "/admin", ["Coming soon"], "Reports is no longer under Coming soon"],
+  ["student1@school.test", `/student/classes/${S1}`, ["Add recording", "Stop sharing"], "students can't manage recordings"],
 ];
 
 const cookies = {};

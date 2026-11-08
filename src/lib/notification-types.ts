@@ -32,6 +32,7 @@ export const NOTIFICATION_TYPES: Record<Role, { type: string; label: string }[]>
     { type: "message", label: "New message from my teacher" },
     { type: "progress_report", label: "New progress report" },
     { type: "ielts_result", label: "New IELTS test result" },
+    { type: "recording_added", label: "Class recording available" },
     { type: "announcement", label: "School announcements" },
     { type: "policy_updated", label: "Class policies updated" },
     { type: "contract_sent", label: "Enrollment agreement ready to sign" },

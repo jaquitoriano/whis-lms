@@ -14,6 +14,7 @@ async function saveSettings(_prev: ActionState, formData: FormData): Promise<Act
     .upsert([
       { key: "students_can_view_teacher_contact", value: formData.get("students_can_view_teacher_contact") === "on" },
       { key: "teachers_can_schedule", value: formData.get("teachers_can_schedule") === "on" },
+      { key: "recordings_visible_by_default", value: formData.get("recordings_visible_by_default") === "on" },
     ]);
   if (error) return { error: "Could not save settings." };
   revalidatePath("/admin/settings");
@@ -42,6 +43,13 @@ export default async function SettingsPage() {
             <span>
               <span className="font-medium">Teachers can schedule their own classes</span>
               <span className="block text-muted">When off, only the school office can add or reschedule classes. Teachers can still complete and cancel them.</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 text-sm">
+            <input type="checkbox" name="recordings_visible_by_default" defaultChecked={map.recordings_visible_by_default !== false} className="mt-1" />
+            <span>
+              <span className="font-medium">Share class recordings with students</span>
+              <span className="block text-muted">The starting choice when a teacher adds a recording link (OD-06). Teachers can still share or hide each recording.</span>
             </span>
           </label>
         </ActionForm>
