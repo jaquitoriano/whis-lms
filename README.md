@@ -14,7 +14,7 @@ Stack: Next.js 16 (App Router, TypeScript, Tailwind) and Supabase (Postgres with
 | 4 | Notifications (bell, notification centre, email, per-type email settings), scheduled reminders, announcements, versioned class policies with student acceptance, settings and password change, audit log | Done. **First launch (MVP) complete** |
 | 4.5 | Phone layouts and menu, upload progress and upload fix, fewer background requests, faster queries, long lists split into pages, homework counts no longer hidden by old work | Done |
 | 5 | Class packages, attendance, enrollment contracts with e-signing (student in the portal, guardian by email link), invoices, payments, receipts, monthly statements, PDFs, teacher pay | Done |
-| 6 | Progress and IELTS reports, messaging | Next |
+| 6 | Monthly progress reports (CEFR levels per skill), IELTS results with the overall band worked out by the database, target band and exam date, band and level charts, "due a report" reminders, teacher–student messaging with attachments (general and per class), admin read-only view of messages | Done |
 | 7 | Recordings, Zoom/Meet connection, advanced reports | Planned (shown as "coming soon" in the portals) |
 
 ## First-time setup (Fedora Linux)
@@ -99,16 +99,30 @@ Run it after every database change.
 
 | Command | What it checks | Needs |
 |---|---|---|
-| `npm run test:rls` | 46 database rules: privacy (who can see and change what), double-booking, private files, homework workflow, notifications, announcements, policies, and Phase 5 (billing privacy, invoice totals and balances, no overpaying, void instead of delete, package usage, attendance, contract signing, teacher pay) | local database |
+| `npm run test:rls` | 61 database rules: privacy (who can see and change what), double-booking, private files, homework workflow, notifications, announcements, policies, Phase 5 (billing privacy, invoice totals and balances, no overpaying, void instead of delete, package usage, attendance, contract signing, teacher pay) and Phase 6 (report and score privacy, draft → published, IELTS band rounding, who is due a report, who can read and write each conversation, attachments, admin audit). The files run one after another, because some tests briefly change shared data | local database |
 | `npm run test:smoke` | Every portal page renders the right content for each role, and other people's pages are refused | local database + `npm run dev` |
 | `npm run test:e2e` | Real browser walk-through: schedule, autosave notes, upload, YouTube, complete, student view, reschedule | local database + `npm run dev`; first run `npx playwright install chromium` |
 | `npm run test:e2e:homework` | Real browser walk-through of homework: assign, draft, photo upload, submit, review, revision, version 2, complete | same as above |
 | `npm run test:e2e:phase5` | Invoice → part payment → PDFs (invoice, receipt, statement), student's classes and payments page, student signs a contract, guardian signs from the emailed link, teacher marks late and records a late cancellation, access checks, phone layout | local database + running app (`npm run dev`); safe to repeat |
+| `npm run test:e2e:phase6` | Teacher writes, saves and publishes a progress report; adds and deletes an IELTS result (overall band shown while typing); chart readout; student sees report and notification; class conversation with a file, reply arriving without a reload; admin read-only view logged; phone layouts | local database + running app; safe to repeat |
 | `npm run test:e2e:phase4` | Announcement → bell → notification centre, email delivered to Mailpit, email settings, policy gate and acceptance, publishing a new policy version | same as above (also needs Docker for cleanup) |
 
 Run `npm run db:reset` first if you have changed data by hand: the tests expect the seed data.
 
 **The tests only run against a local database.** They read `.env.local` and refuse to start if it points anywhere else. If your `.env.local` points to a hosted project, keep the local settings in another file and name it for the tests and the app: `$env:ENV_FILE=".env.test"` for the tests (PowerShell), plus the same values as process variables for `npm run dev`, which take priority over `.env.local`.
+
+## Decisions made for Phase 6 (Nov 2026, change if needed)
+
+- **Progress reports** (PRG-01..02) rate Speaking, Listening, Reading, Writing, Grammar, Vocabulary, Pronunciation and Fluency, plus an overall level, on the **CEFR scale with "+" half steps** (A1, A1+, A2 … C1+, C2). That matches the class levels already used (B1, B2…) and is easy for parents to read. A skill can be left "Not assessed". The overall level is the teacher's choice; the form suggests the average.
+- A report is a **draft** (only its teacher sees it) until **published**; then the student is notified. The author can still correct a published report, and every correction is in the audit log. Only an admin can remove a published report. A new report starts from the last report's levels and period.
+- **Due a report**: a student is due once their earliest class since the last report is more than 30 days old (setting `progress_report_days`). Teachers see this on their dashboard and Student Progress page, and get one reminder a week. Admins see everyone's under Student progress.
+- **IELTS results** (PRG-03): diagnostic, mock or official; Academic or General Training; four bands in 0.5 steps. The **overall band is calculated by the database** (mean, nearest 0.5, .25 → .5 and .75 → next band); a test with fewer than four skills has no overall band. Results show to the student straight away, with a notification. A teacher can change or delete only results they entered; admins any. A **target band and exam date** per student are an addition to the brief.
+- Teachers see the reports and results of students they currently teach, including earlier teachers' (like lesson history). Students see their own published reports and results. Guardians have no access yet.
+- **Messages** (MSG-01): one general conversation per teacher and student, plus one per class ("Message about this class" on the class page). Text up to 5,000 characters and up to 10 files per message (25 MB each, private storage). Messages can't be edited or deleted. A conversation refreshes itself every 10 seconds while open.
+- Only the two people can write, and only while the teacher is assigned. When a student moves teacher, the old teacher loses the conversation and the student can still read it.
+- **Admins can read every conversation but can't post** (safeguarding, especially for minors). Each time an admin opens one it is written to the audit log, and users are told the school can read messages.
+- **Notifications and emails for messages say who wrote, never what they wrote**, and there is one per unread conversation, not one per message. If the person reads it before the email goes out, the email is skipped.
+- Not built: admin messaging, hiding or deleting a harmful message, read receipts, WhatsApp/LINE/Viber (OD-07, Phase 7), IELTS Writing/Speaking sub-scores (criteria bands).
 
 ## Decisions made for Phase 5 (Nov 2026, change if needed)
 

@@ -8,6 +8,8 @@ import { SessionList } from "@/components/class/SessionList";
 import { HomeworkTable } from "@/components/homework/HomeworkTable";
 import { listHomework } from "@/lib/homework";
 import { AnnouncementsPanel } from "@/components/portal/Announcements";
+import { unreadMessageCount } from "@/lib/messages";
+import { cefrDescription, cefrLabel, fmtBand, formatPlainDate, IELTS_KIND_LABEL, type IeltsKind } from "@/lib/progress-shared";
 import { Avatar, PageHeader } from "@/components/ui";
 
 export const metadata = { title: "Student dashboard" };
@@ -17,7 +19,7 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
   const { supabase, profile } = await requireRole("student");
   const tz = profile.timezone;
   const now = new Date();
-  const [teachers, enrollment, upcoming, history, openHomework, { data: toSign }, { data: openInvoices }] = await Promise.all([
+  const [teachers, enrollment, upcoming, history, openHomework, { data: toSign }, { data: openInvoices }, { data: report }, { data: band }, unread] = await Promise.all([
     getMyTeachers(supabase, profile.id),
     getMyEnrollment(supabase, profile.id),
     getSessions(supabase, { from: new Date(now.getTime() - 60 * 60000), to: new Date(now.getTime() + 60 * 86400000), studentId: profile.id }),
@@ -25,6 +27,10 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
     listHomework(supabase, { studentId: profile.id, statuses: ["assigned", "needs_revision"] }),
     supabase.from("contracts").select("id, title, signer_kind, signer_name").eq("status", "sent").limit(1),
     supabase.from("invoices").select("id, due_date").in("status", ["unpaid", "partially_paid"]),
+    // DASH-01 progress: latest published report and latest full IELTS result.
+    supabase.from("progress_reports").select("overall, period_end").eq("student_id", profile.id).eq("status", "published").order("period_end", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("ielts_results").select("overall, kind, test_date").eq("student_id", profile.id).not("overall", "is", null).order("test_date", { ascending: false }).limit(1).maybeSingle(),
+    unreadMessageCount(supabase),
   ]);
   const contractToSign = (toSign ?? []).find((c) => c.signer_kind === "self");
   const overdueCount = (openInvoices ?? []).filter((i) => i.due_date < now.toISOString().slice(0, 10)).length;
@@ -47,6 +53,11 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
       {overdueCount > 0 && (
         <Link href="/student/billing" className="mb-4 block rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 hover:bg-red-100">
           You have {overdueCount} overdue invoice{overdueCount > 1 ? "s" : ""}. See Classes and payments →
+        </Link>
+      )}
+      {unread > 0 && (
+        <Link href="/student/messages" className="mb-4 block rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-700 hover:bg-brand-100">
+          You have {unread === 1 ? "a new message" : `new messages in ${unread} conversations`} from your teacher →
         </Link>
       )}
       {policies === "accepted" && <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">Thank you. You have accepted the class policies.</p>}
@@ -109,6 +120,39 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
             </div>
           ) : (
             <p className="text-sm text-muted">Feedback from your teacher will appear here after each class.</p>
+          )}
+        </section>
+
+        <section className="card lg:col-span-2">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-semibold">My progress</h2>
+            <Link href="/student/progress" className="text-sm text-brand-700 hover:underline">
+              See all
+            </Link>
+          </div>
+          {report || band ? (
+            <dl className="grid gap-4 text-sm sm:grid-cols-2">
+              {report && (
+                <div>
+                  <dt className="text-muted">Current level</dt>
+                  <dd className="text-xl font-semibold">
+                    {cefrLabel(report.overall)} <span className="text-sm font-normal text-muted">{cefrDescription(report.overall)}</span>
+                  </dd>
+                  <dd className="text-xs text-muted">Report to {formatPlainDate(report.period_end)}</dd>
+                </div>
+              )}
+              {band && (
+                <div>
+                  <dt className="text-muted">Latest IELTS band</dt>
+                  <dd className="text-xl font-semibold tabular-nums">{fmtBand(band.overall)}</dd>
+                  <dd className="text-xs text-muted">
+                    {IELTS_KIND_LABEL[band.kind as IeltsKind]}, {formatPlainDate(band.test_date)}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          ) : (
+            <p className="text-sm text-muted">Your teacher&apos;s progress reports will appear here.</p>
           )}
         </section>
 

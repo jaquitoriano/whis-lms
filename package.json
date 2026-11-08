@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:rls": "node --test tests/rls.test.mjs tests/phase5.test.mjs",
+    "test:rls": "node --test --test-concurrency=1 tests/rls.test.mjs tests/phase5.test.mjs tests/phase6.test.mjs",
     "db:start": "supabase start",
     "db:reset": "supabase db reset",
     "db:stop": "supabase stop",
@@ -16,6 +16,7 @@
     "test:e2e:homework": "node tests/e2e-homework.mjs",
     "test:e2e:phase4": "node tests/e2e-phase4.mjs",
     "test:e2e:phase5": "node tests/e2e-phase5.mjs",
+    "test:e2e:phase6": "node tests/e2e-phase6.mjs",
     "notify": "node scripts/run-notifications.mjs"
   },
   "dependencies": {

@@ -8,6 +8,10 @@ import { getLessonHistory } from "@/lib/lesson-history";
 import { getSessions } from "@/lib/sessions";
 import { listHomework } from "@/lib/homework";
 import { HomeworkTable } from "@/components/homework/HomeworkTable";
+import { SubmitButton } from "@/components/SubmitButton";
+import { openConversation } from "@/lib/message-actions";
+import { getProgressSummaries } from "@/lib/progress";
+import { cefrLabel, fmtBand, formatPlainDate } from "@/lib/progress-shared";
 import type { Contact, Course, Guardian, Profile, StudentProfile } from "@/lib/types";
 
 export const metadata = { title: "Student" };
@@ -30,7 +34,8 @@ export default async function TeacherStudentPage({ params }: { params: Promise<{
     // Teachers see only how many classes are left in the student's package, never prices.
     supabase.rpc("classes_left", { p_student: id }),
   ]);
-  const homework = await listHomework(supabase, { studentId: id });
+  const [homework, summaries] = await Promise.all([listHomework(supabase, { studentId: id }), getProgressSummaries(supabase, [id])]);
+  const progress = summaries.get(id);
   const s = sp as (StudentProfile & { course: Pick<Course, "name" | "default_duration_min"> | null }) | null;
 
   return (
@@ -47,6 +52,12 @@ export default async function TeacherStudentPage({ params }: { params: Promise<{
             <span>Local time zone: {student.timezone}</span>
           </div>
         </div>
+        <form action={openConversation} className="ml-auto">
+          <input type="hidden" name="with" value={id} />
+          <SubmitButton className="btn-secondary" pendingText="Opening…">
+            Message
+          </SubmitButton>
+        </form>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -95,6 +106,24 @@ export default async function TeacherStudentPage({ params }: { params: Promise<{
                 </dd>
               </div>
             ))}
+          </dl>
+        </section>
+        <section className="card">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-semibold">Progress</h2>
+            <Link href={`/teacher/progress/${id}`} className="text-sm text-brand-700 hover:underline">
+              Reports and IELTS
+            </Link>
+          </div>
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt className="text-muted">Level (last report)</dt>
+              <dd className="font-medium">{progress?.report ? `${cefrLabel(progress.report.overall)} · ${formatPlainDate(progress.report.period_end)}` : "No report yet"}</dd>
+            </div>
+            <div>
+              <dt className="text-muted">Latest IELTS band</dt>
+              <dd className="font-medium">{progress?.ielts ? fmtBand(progress.ielts.overall) : "—"}</dd>
+            </div>
           </dl>
         </section>
         <section className="card">

@@ -38,6 +38,11 @@ const ANA = "00000000-0000-4000-a000-000000000022";
 const HW1 = "30000000-0000-4000-a000-000000000001"; // Kenji, completed after a revision
 const HW2 = "30000000-0000-4000-a000-000000000002"; // Kenji, submitted, waiting for review
 const HW3 = "30000000-0000-4000-a000-000000000003"; // Kenji, open
+const R_KENJI = "60000000-0000-4000-a000-000000000002"; // Kenji's latest published report (Maria)
+const R_ANA = "60000000-0000-4000-a000-000000000003"; // Ana's report (James)
+const R_DRAFT = "60000000-0000-4000-a000-000000000004"; // Min-jun, Maria's draft
+const T_GENERAL = "62000000-0000-4000-a000-000000000001"; // Maria <-> Kenji
+const T_CLASS = "62000000-0000-4000-a000-000000000002"; // about class S3
 
 const mustHave = [
   ["admin@school.test", "/admin", ["Classes today", "Past classes not closed", "Students without a teacher"]],
@@ -98,6 +103,28 @@ const mustHave = [
   ["student1@school.test", "/student/policies", ["You accepted these policies"]],
   ["student1@school.test", "/student", ["Holiday schedule"]],
   ["student3@school.test", "/accept-policies", ["Please read them and confirm", "Accept and continue"]],
+  // Phase 6: progress, IELTS, messages
+  ["teacher1@school.test", "/teacher/progress", ["Student progress", "Kenji Tanaka", "Min-jun Park", "Draft"]],
+  ["teacher1@school.test", `/teacher/progress/${KENJI}`, ["Latest report", "B2", "IELTS results", "Overall band", "Target 7.0", "Add a result", "Write progress report", "Cambridge IELTS 18", "Earlier reports"]],
+  ["teacher1@school.test", `/teacher/progress/reports/${R_DRAFT}`, ["Publish to student", "Save draft", "Skill levels", "Min-jun Park"]],
+  ["teacher1@school.test", `/teacher/progress/reports/${R_KENJI}`, ["Correct progress report", "Save changes", "Previous report"]],
+  ["teacher1@school.test", "/teacher", ["Progress reports due"]],
+  ["teacher1@school.test", `/teacher/students/${KENJI}`, ["Reports and IELTS", "6.5", "Message"]],
+  ["teacher1@school.test", `/teacher/classes/${S3}`, ["Message about this class"]],
+  ["teacher1@school.test", "/teacher/messages", ["Messages", "Kenji Tanaka", "Will we practise Speaking Part 3", "Message a student"]],
+  ["teacher1@school.test", `/teacher/messages/${T_GENERAL}`, ["well done on the second version", "Should I write another Task 2 essay", "message-body", "the school office can read messages"]],
+  ["student1@school.test", "/student/progress", ["My progress", "B2", "Upper intermediate", "Latest IELTS band", "6.5", "Target band", "Earlier reports", "Overall level over time"]],
+  ["student1@school.test", "/student", ["My progress", "Latest IELTS band"]],
+  ["student1@school.test", "/student/teacher", ["Send a message"]],
+  ["student1@school.test", "/student/messages", ["Maria Santos", "Message Maria", "General"]],
+  ["student1@school.test", `/student/messages/${T_CLASS}`, ["Speaking Part 3", "Class on"]],
+  ["student1@school.test", "/student/settings", ["New message from my teacher", "New progress report"]],
+  ["student2@school.test", "/student/progress", ["B1", "Meeting language"]],
+  ["admin@school.test", "/admin/progress", ["Student progress", "Kenji Tanaka", "Ana Reyes", "James Carter"]],
+  ["admin@school.test", `/admin/progress/${KENJI}`, ["Latest report", "Add a result", "Student details"]],
+  ["admin@school.test", `/admin/progress/reports/${R_ANA}`, ["Correct progress report", "Remove this report"]],
+  ["admin@school.test", "/admin/messages", ["Maria Santos and Kenji Tanaka"]],
+  ["admin@school.test", `/admin/messages/${T_GENERAL}`, ["reading this as the school office", "well done on the second version"]],
 ];
 const refused = [
   ["teacher1@school.test", `/teacher/students/${ANA}`, (r) => r.status === 404, "teacher opening another teacher's student -> 404"],
@@ -110,6 +137,13 @@ const refused = [
   ["student1@school.test", "/accept-policies", (r) => r.status === 307 && r.loc.endsWith("/student"), "students who already accepted skip the gate"],
   ["student2@school.test", `/student/homework/${HW1}`, (r) => r.status === 404, "student opening another student's homework -> 404"],
   ["teacher2@school.test", `/teacher/homework/${HW1}`, (r) => r.status === 404, "teacher opening another teacher's homework -> 404"],
+  ["teacher2@school.test", `/teacher/progress/${KENJI}`, (r) => r.status === 404, "teacher opening another teacher's student's progress -> 404"],
+  ["teacher2@school.test", `/teacher/progress/reports/${R_KENJI}`, (r) => r.status === 404, "teacher opening another teacher's report -> 404"],
+  ["teacher1@school.test", `/teacher/progress/reports/${R_ANA}`, (r) => r.status === 404, "...the other way round too"],
+  ["teacher2@school.test", `/teacher/messages/${T_GENERAL}`, (r) => r.status === 404, "teacher opening another teacher's conversation -> 404"],
+  ["student2@school.test", `/student/messages/${T_GENERAL}`, (r) => r.status === 404, "student opening another student's conversation -> 404"],
+  ["student1@school.test", "/student/messages/00000000-0000-4000-a000-0000000000ff", (r) => r.status === 404, "unknown conversation -> 404"],
+  ["student3@school.test", "/student/messages", (r) => r.status === 307 && r.loc.endsWith("/accept-policies"), "messages are behind the policy gate too"],
 ];
 const mustNotHave = [
   ["student1@school.test", `/student/classes/${S3}`, ["Mark completed", "Private notes", "Upload file"], "student class page has no edit controls"],
@@ -117,6 +151,9 @@ const mustNotHave = [
   ["admin@school.test", `/admin/homework/${HW2}`, ["Request revision", "Upload corrected file", "Withdraw"], "admin homework view is read-only"],
   ["teacher1@school.test", "/teacher/policies", ["Accept and continue"], "teachers aren't asked to accept"],
   ["student1@school.test", `/student/homework/${HW2}`, ["Request revision", "Submit homework"], "student can't review or resubmit while under review"],
+  ["student1@school.test", "/student/progress", ["Add a result", "Write progress report", "Min-jun", "Save target"], "student progress page is read-only and private"],
+  ["admin@school.test", `/admin/messages/${T_GENERAL}`, ["message-body", "Attach files"], "admins can't post in conversations"],
+  ["teacher1@school.test", "/teacher", ["Coming soon"], "no Phase 6 items left under Coming soon for teachers"],
 ];
 
 const cookies = {};

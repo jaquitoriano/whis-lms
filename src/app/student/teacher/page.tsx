@@ -1,6 +1,8 @@
 import { requireRole } from "@/lib/auth";
 import { getMyTeachers } from "@/lib/student-data";
 import { Avatar, EmptyState, PageHeader } from "@/components/ui";
+import { SubmitButton } from "@/components/SubmitButton";
+import { openConversation } from "@/lib/message-actions";
 
 export const metadata = { title: "My Teacher" };
 
@@ -25,6 +27,10 @@ export default async function MyTeacherPage() {
                 </div>
               </div>
               {t.teacher_profile?.bio && <p className="mt-4 text-sm">{t.teacher_profile.bio}</p>}
+              <form action={openConversation} className="mt-4">
+                <input type="hidden" name="with" value={t.id} />
+                <SubmitButton pendingText="Opening…">Send a message</SubmitButton>
+              </form>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                 {t.teacher_profile?.qualifications && (
                   <div>
@@ -54,7 +60,7 @@ export default async function MyTeacherPage() {
                 ) : (
                   <div className="sm:col-span-2">
                     <dt className="text-muted">Contact</dt>
-                    <dd>Please contact your teacher through the school office. In-site messaging arrives in a later update.</dd>
+                    <dd>Use Messages to write to your teacher, or contact the school office.</dd>
                   </div>
                 )}
               </dl>
