@@ -16,7 +16,7 @@ Stack: Next.js 16 (App Router, TypeScript, Tailwind) and Supabase (Postgres with
 | 5 | Class packages, attendance, enrollment contracts with e-signing (student in the portal, guardian by email link), invoices, payments, receipts, monthly statements, PDFs, teacher pay | Done |
 | 6 | Monthly progress reports (CEFR levels per skill), IELTS results with the overall band worked out by the database, target band and exam date, band and level charts, "due a report" reminders, teacher–student messaging with attachments (general and per class), admin read-only view of messages | Done |
 | 7a | Class recording links with per-recording sharing (admin default), admin reports (month by month, teachers, students who need a look) with CSV downloads, notification job every 15 minutes from Supabase | Done |
-| 7b | Zoom / Google Meet connection (automatic meeting and recording links), other messaging channels (WhatsApp, LINE, Viber) | Waiting for the platform choice and accounts |
+| 7b | Zoom and Google Meet connection: meeting links created, moved and deleted with each class, recordings attached after class, per-teacher accounts | Built; switched on per teacher once the school's Zoom / Google accounts are set up (see "Online meetings"). WhatsApp, LINE and Viber are not planned for now |
 
 ## First-time setup (Fedora Linux)
 
@@ -59,6 +59,15 @@ Local extras: Supabase Studio (database browser) at http://127.0.0.1:54323, and 
 - Locally, run it with `npm run notify`. In production, `vercel.json` schedules it every 15 minutes (on Vercel's free plan crons run at most daily, so use the Pro plan or any external scheduler that calls the URL with `Authorization: Bearer <CRON_SECRET>`).
 - Production email: set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` and `NEXT_SITE_URL` (the live address, used in email links) for your provider (e.g. Resend), plus a long random `CRON_SECRET`. Supabase also calls the job every 15 minutes (see Phase 7 decisions), so the Vercel plan doesn't matter.
 
+### Online meetings (Zoom and Google Meet)
+
+Each teacher is connected on their admin page (Users → teacher → **Online meetings**) to their own Zoom user or Google Workspace address. Classes booked without a link then get one automatically. The credentials below go in the server's environment (Vercel), never in the database.
+
+- **Zoom**: in the Zoom App Marketplace, as a Zoom account admin, create a **Server-to-Server OAuth** app. Give it the scopes to create, update and delete meetings and to read cloud recordings (admin level), activate it, and set `ZOOM_ACCOUNT_ID`, `ZOOM_CLIENT_ID`, `ZOOM_CLIENT_SECRET`. Each teacher needs a **licensed** Zoom user in that account (a licensed user hosts one meeting at a time). Automatic cloud recording needs Zoom Pro or higher.
+- **Google Meet**: in Google Cloud, create a service account and a JSON key, enable the **Google Calendar API** and **Google Meet REST API**. In the Google Workspace admin console, give the service account **domain-wide delegation** for `https://www.googleapis.com/auth/calendar.events` and `https://www.googleapis.com/auth/meetings.space.readonly`. Set `GOOGLE_SERVICE_ACCOUNT_EMAIL` and `GOOGLE_SERVICE_ACCOUNT_KEY` (the key's `private_key`, with `\n` for line breaks). Teachers need Workspace addresses; Meet recording needs a Workspace edition that includes it.
+- Until the credentials are set, the teacher's admin page says which ones are missing and the class page shows why no link was made.
+- Locally and in tests, `MEETINGS_FAKE=1 npm run dev` uses a fake service: links look like `https://meet.example.com/zoom/…`, and a host address containing `fail` always fails.
+
 ## Test accounts (local only)
 
 All passwords: `Password123!`
@@ -100,18 +109,30 @@ Run it after every database change.
 
 | Command | What it checks | Needs |
 |---|---|---|
-| `npm run test:rls` | 70 database rules: privacy (who can see and change what, including student contact details being admin-only), double-booking, private files, homework workflow, notifications, announcements, policies, Phase 5 (billing privacy, invoice totals and balances, no overpaying, void instead of delete, package usage, low-classes alerts for teachers, attendance, contract signing, teacher pay) and Phase 6 (report and score privacy, draft → published, IELTS band rounding, who is due a report, who can read and write each conversation, attachments, admin audit) and Phase 7 (who can add, share and see recordings, the sharing default, reports for admins only, report figures match the records). The files run one after another, because some tests briefly change shared data | local database |
+| `npm run test:rls` | 81 database rules: privacy (who can see and change what, including student contact details being admin-only), double-booking, private files, homework workflow, notifications, announcements, policies, Phase 5 (billing privacy, invoice totals and balances, no overpaying, void instead of delete, package usage, low-classes alerts for teachers, attendance, contract signing, teacher pay) and Phase 6 (report and score privacy, draft → published, IELTS band rounding, who is due a report, who can read and write each conversation, attachments, admin audit) and Phase 7 (who can add, share and see recordings, the sharing default, reports for admins only, report figures match the records) and Phase 7b (who connects teachers to Zoom or Google and sees the link queue; what booking, moving, cancelling and pasting a link queue up; retries). The files run one after another, because some tests briefly change shared data | local database |
 | `npm run test:smoke` | Every portal page renders the right content for each role, and other people's pages are refused | local database + `npm run dev` |
 | `npm run test:e2e` | Real browser walk-through: schedule, autosave notes, upload, YouTube, complete, student view, reschedule | local database + `npm run dev`; first run `npx playwright install chromium` |
 | `npm run test:e2e:homework` | Real browser walk-through of homework: assign, draft, photo upload, submit, review, revision, version 2, complete | same as above |
 | `npm run test:e2e:phase5` | Invoice → part payment → PDFs (invoice, receipt, statement), student's classes and payments page, student signs a contract, guardian signs from the emailed link, teacher marks late and records a late cancellation, access checks, phone layout | local database + running app (`npm run dev`); safe to repeat |
 | `npm run test:e2e:phase6` | Teacher writes, saves and publishes a progress report; adds and deletes an IELTS result (overall band shown while typing); chart readout; student sees report and notification; class conversation with a file, reply arriving without a reload; admin read-only view logged; phone layouts | local database + running app; safe to repeat |
+| `npm run test:e2e:phase7b` | Admin connects a teacher to Zoom, books a class and the link appears by itself; a failing account shows the reason and a retry button; the scheduled job deletes a cancelled class's meeting and attaches a recording after class, once, with the student notified | local database + app running with `MEETINGS_FAKE=1 npm run dev`; safe to repeat |
 | `npm run test:e2e:phase7` | Teacher adds a recording without sharing it, student can't see it, teacher shares it, student opens it and is notified; admin reports with period switch and CSV download; phone layouts | local database + running app; safe to repeat |
 | `npm run test:e2e:phase4` | Announcement → bell → notification centre, email delivered to Mailpit, email settings, policy gate and acceptance, publishing a new policy version | same as above (also needs Docker for cleanup) |
 
 Run `npm run db:reset` first if you have changed data by hand: the tests expect the seed data.
 
 **The tests only run against a local database.** They read `.env.local` and refuse to start if it points anywhere else. If your `.env.local` points to a hosted project, keep the local settings in another file and name it for the tests and the app: `$env:ENV_FILE=".env.test"` for the tests (PowerShell), plus the same values as process variables for `npm run dev`, which take priority over `.env.local`.
+
+## Decisions made for Phase 7, part 2 (Nov 2026, change if needed)
+
+- **Both Zoom and Google Meet**, chosen per teacher; each teacher hosts their own classes from their own account, so classes at the same time never clash.
+- **The database keeps the queue** (`class_meetings`): booking a class without a link queues a meeting; a new time moves it; cancelling deletes it; pasting a different link replaces it (the automatic meeting is deleted). **Rescheduling keeps the same link**, moved to the new time. The server works the queue just after each change and every 15 minutes, retries up to 8 times, then waits for "Try again now" on the class page.
+- **Students are never added to Zoom or Google** and get no invitations from them: they join from the class page. The meeting title shows the course and the student's first name only.
+- **Recordings** are looked for from 15 minutes after class, every hour, for 3 days. Zoom recordings follow the "Share class recordings with students" setting. Google Meet recordings stay unshared, because the file sits in the teacher's Google Drive: the teacher sets it to "Anyone with the link" there, then shares it on the class page.
+- "Record Zoom classes automatically" (Website settings, on by default) turns on Zoom cloud recording for new meetings. Google Meet recording is started in the meeting.
+- Connecting a teacher after classes were booked: "Create links for upcoming classes" on the teacher's page.
+- Changing a class's teacher is not supported by the sync (the app has no such action today).
+- Not built: WhatsApp, LINE and Viber (left out by decision; in-site and email notifications only).
 
 ## Change requests from the school (Nov 2026)
 

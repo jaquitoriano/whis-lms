@@ -31,6 +31,8 @@ try {
   await page.goto(B + `/teacher/calendar/new?date=${date}`);
   await pick(page, "Kenji Tanaka");
   await page.fill("#time", "14:00"); await page.fill("#meeting_url", "https://zoom.us/j/123456");
+  // 5 days ahead can be a weekend, outside the seeded Mon–Fri hours.
+  await page.check("input[name=override]");
   await page.click("main button[type=submit]"); await page.waitForURL(/\/teacher\/classes\//, { timeout: 15000 });
   const id = page.url().split("/").pop(); created.push(id);
   ok("scheduling a class opens its class page", /^[0-9a-f-]{36}$/.test(id));
