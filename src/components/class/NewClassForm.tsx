@@ -65,6 +65,7 @@ export function NewClassForm({ pairs, date, tz, courses }: { pairs: Pair[]; date
         <div>
           <label className="label" htmlFor="meeting_url">Meeting link (Zoom, Google Meet…)</label>
           <input className="input" id="meeting_url" name="meeting_url" type="url" placeholder="https://" />
+          <p className="mt-1 text-xs text-muted">Leave empty for teachers connected to Zoom or Google Meet: a link is created automatically.</p>
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="override" /> Schedule anyway if outside the teacher&apos;s available hours

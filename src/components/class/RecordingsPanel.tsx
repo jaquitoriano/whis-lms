@@ -3,7 +3,7 @@ import { ActionForm } from "@/components/ActionForm";
 import { SubmitButton } from "@/components/SubmitButton";
 import { addRecording, deleteRecording, setRecordingShared } from "@/lib/recording-actions";
 
-type Recording = { id: string; title: string; url: string; passcode: string | null; visible_to_student: boolean; created_at: string };
+type Recording = { id: string; title: string; url: string; passcode: string | null; visible_to_student: boolean; created_at: string; source: "manual" | "zoom" | "google_meet" };
 
 // Class recordings (REC-01..02): links to Zoom / Google Meet recordings; no video is stored here.
 // Students see only recordings shared with them (the database filters the rest out).
@@ -22,7 +22,7 @@ export async function RecordingsPanel({
   sharedByDefault: boolean;
   classOver: boolean;
 }) {
-  const { data } = await supabase.from("class_recordings").select("id, title, url, passcode, visible_to_student, created_at").eq("session_id", sessionId).order("created_at");
+  const { data } = await supabase.from("class_recordings").select("id, title, url, passcode, visible_to_student, created_at, source").eq("session_id", sessionId).order("created_at");
   const recs = (data ?? []) as Recording[];
   if (!canManage && recs.length === 0 && !isStudent) return null;
   if (isStudent && recs.length === 0 && !classOver) return null;
@@ -42,7 +42,11 @@ export async function RecordingsPanel({
               {canManage && (
                 <p className="text-xs">
                   {r.visible_to_student ? <span className="text-green-700">Shared with the student</span> : <span className="text-amber-700">Not shared with the student</span>}
+                  {r.source !== "manual" && <span className="text-muted"> · added automatically from {r.source === "zoom" ? "Zoom" : "Google Meet"}</span>}
                 </p>
+              )}
+              {canManage && r.source === "google_meet" && !r.visible_to_student && (
+                <p className="text-xs text-muted">The file is in your Google Drive. Set it to &quot;Anyone with the link can view&quot; in Drive first, then share it here.</p>
               )}
             </div>
             {canManage && (

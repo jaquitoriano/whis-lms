@@ -7,6 +7,7 @@ import { youtubeId } from "@/lib/sessions";
 import { addDays, isDateStr, zonedParts, zonedToUtc } from "@/lib/time";
 import type { ActionState } from "@/lib/types";
 import { LESSON_FIELDS, SKILLS, type LessonField } from "@/lib/lesson-fields";
+import { syncSoon } from "@/lib/meetings/sync";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 
@@ -99,6 +100,7 @@ export async function createClasses(_prev: ActionState, formData: FormData): Pro
   }));
   const { data, error } = await supabase.from("class_sessions").insert(rows).select("id");
   if (error) return { error: dbError(error) };
+  syncSoon(); // Zoom / Google Meet links for connected teachers
   refresh();
   if (data && data.length === 1) redirect(`/${profile.role}/classes/${data[0].id}`);
   return { ok: true, message: `${rows.length} classes scheduled.` };
@@ -127,6 +129,7 @@ export async function setClassStatus(sessionId: string, _prev: ActionState, form
   if (error) return { error: dbError(error) };
   if (!data?.length) return { error: "You don't have permission to change this class." };
   // ATT-02: the status sets a default mark (completed = present); a late arrival replaces it.
+  if (status === "cancelled") syncSoon(); // removes the Zoom / Google meeting
   if (late) await supabase.from("attendance").update({ mark: "late", minutes_late: minutesLate }).eq("session_id", sessionId);
 
   // Completing a class shares its lesson record with the student.
@@ -198,6 +201,7 @@ export async function rescheduleClass(sessionId: string, _prev: ActionState, for
     p_reason: reason,
   });
   if (error) return { error: dbError(error) };
+  syncSoon(); // moves the Zoom / Google meeting to the new time
   refresh(sessionId);
   redirect(`/${profile.role}/classes/${newId}`);
 }
@@ -208,6 +212,7 @@ export async function updateMeetingLink(sessionId: string, _prev: ActionState, f
   if (url && !/^https:\/\//i.test(url)) return { error: "The link must start with https://" };
   const { error, data } = await supabase.from("class_sessions").update({ meeting_url: url }).eq("id", sessionId).select("id");
   if (error || !data?.length) return { error: dbError(error) };
+  syncSoon(); // a hand-typed link replaces the automatic meeting, which is then deleted
   refresh(sessionId);
   return { ok: true, message: "Meeting link saved." };
 }

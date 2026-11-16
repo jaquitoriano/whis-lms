@@ -15,6 +15,7 @@ async function saveSettings(_prev: ActionState, formData: FormData): Promise<Act
       { key: "students_can_view_teacher_contact", value: formData.get("students_can_view_teacher_contact") === "on" },
       { key: "teachers_can_schedule", value: formData.get("teachers_can_schedule") === "on" },
       { key: "recordings_visible_by_default", value: formData.get("recordings_visible_by_default") === "on" },
+      { key: "meetings_record_automatically", value: formData.get("meetings_record_automatically") === "on" },
     ]);
   if (error) return { error: "Could not save settings." };
   revalidatePath("/admin/settings");
@@ -50,6 +51,15 @@ export default async function SettingsPage() {
             <span>
               <span className="font-medium">Share class recordings with students</span>
               <span className="block text-muted">The starting choice when a teacher adds a recording link (OD-06). Teachers can still share or hide each recording.</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 text-sm">
+            <input type="checkbox" name="meetings_record_automatically" defaultChecked={map.meetings_record_automatically !== false} className="mt-1" />
+            <span>
+              <span className="font-medium">Record Zoom classes automatically</span>
+              <span className="block text-muted">
+                For teachers connected to Zoom: new meetings record to the Zoom cloud, and the recording is attached to the class afterwards. Google Meet recording is started by the teacher in the meeting.
+              </span>
             </span>
           </label>
         </ActionForm>
