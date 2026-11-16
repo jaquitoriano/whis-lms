@@ -89,6 +89,27 @@ test("teacher sees only assigned students", async () => {
   assert.equal(anaContact.data.length, 0);
 });
 
+test("teacher cannot read contact details or guardians, even of assigned students", async () => {
+  const maria = await as("teacher1@school.test");
+  const c = await maria.from("profile_contacts").select("user_id").in("user_id", [ID.kenji, ID.minjun]);
+  assert.equal(c.data.length, 0, "student email and phone are admin-only");
+  const own = await maria.from("profile_contacts").select("user_id");
+  assert.deepEqual(ids(own.data, "user_id"), [ID.maria], "teacher still reads their own contact");
+  const g = await maria.from("guardians").select("id").in("student_id", [ID.kenji, ID.minjun]);
+  assert.equal(g.data.length, 0, "guardian details are admin-only");
+  const sp = await maria.from("student_profiles").select("user_id").eq("user_id", ID.kenji);
+  assert.equal(sp.data.length, 1, "teaching details stay visible");
+});
+
+test("student still reads own guardians; admin reads all contacts", async () => {
+  const minjun = await as("student3@school.test");
+  const g = await minjun.from("guardians").select("student_id");
+  assert.deepEqual(ids(g.data, "student_id"), [ID.minjun], "a student sees their own guardian");
+  const admin = await as("admin@school.test");
+  const c = await admin.from("profile_contacts").select("user_id").in("user_id", [ID.kenji, ID.minjun]);
+  assert.equal(c.data.length, 2);
+});
+
 test("teacher cannot see admin notes about themselves or settings", async () => {
   const maria = await as("teacher1@school.test");
   const n = await maria.from("teacher_admin_notes").select("*");

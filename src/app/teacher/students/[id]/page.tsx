@@ -12,7 +12,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { openConversation } from "@/lib/message-actions";
 import { getProgressSummaries } from "@/lib/progress";
 import { cefrLabel, fmtBand, formatPlainDate } from "@/lib/progress-shared";
-import type { Contact, Course, Guardian, Profile, StudentProfile } from "@/lib/types";
+import type { Course, Profile, StudentProfile } from "@/lib/types";
 
 export const metadata = { title: "Student" };
 
@@ -25,10 +25,9 @@ export default async function TeacherStudentPage({ params }: { params: Promise<{
   const { data: student } = await supabase.from("profiles").select("*").eq("id", id).eq("role", "student").maybeSingle<Profile>();
   if (!student) notFound();
 
-  const [{ data: sp }, { data: contact }, { data: guardians }, history, upcoming, { data: classesLeft }] = await Promise.all([
+  // Contact details (student and guardian) are admin-only; the database hides them from teachers.
+  const [{ data: sp }, history, upcoming, { data: classesLeft }] = await Promise.all([
     supabase.from("student_profiles").select("*, course:courses(name, default_duration_min)").eq("user_id", id).maybeSingle(),
-    supabase.from("profile_contacts").select("*").eq("user_id", id).maybeSingle<Contact>(),
-    supabase.from("guardians").select("*").eq("student_id", id),
     getLessonHistory(supabase, { studentId: id, limit: 50 }),
     getSessions(supabase, { from: new Date(), to: new Date(Date.now() + 60 * 86400000), studentId: id }),
     // Teachers see only how many classes are left in the student's package, never prices.
@@ -84,28 +83,6 @@ export default async function TeacherStudentPage({ params }: { params: Promise<{
               <dt className="text-muted">Class length</dt>
               <dd>{s?.course ? `${s.course.default_duration_min} min` : "—"}</dd>
             </div>
-          </dl>
-        </section>
-        <section className="card">
-          <h2 className="mb-3 font-semibold">Contact</h2>
-          <dl className="space-y-2 text-sm">
-            <div>
-              <dt className="text-muted">Email</dt>
-              <dd>{contact?.email}</dd>
-            </div>
-            <div>
-              <dt className="text-muted">Phone</dt>
-              <dd>{contact?.phone || "—"}</dd>
-            </div>
-            {((guardians ?? []) as Guardian[]).map((g) => (
-              <div key={g.id}>
-                <dt className="text-muted">Guardian{g.relationship && ` (${g.relationship})`}</dt>
-                <dd>
-                  {g.full_name}
-                  <span className="block text-muted">{[g.email, g.phone].filter(Boolean).join(" · ")}</span>
-                </dd>
-              </div>
-            ))}
           </dl>
         </section>
         <section className="card">
