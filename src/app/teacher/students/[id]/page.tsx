@@ -26,12 +26,10 @@ export default async function TeacherStudentPage({ params }: { params: Promise<{
   if (!student) notFound();
 
   // Contact details (student and guardian) are admin-only; the database hides them from teachers.
-  const [{ data: sp }, history, upcoming, { data: classesLeft }] = await Promise.all([
+  const [{ data: sp }, history, upcoming] = await Promise.all([
     supabase.from("student_profiles").select("*, course:courses(name, default_duration_min)").eq("user_id", id).maybeSingle(),
     getLessonHistory(supabase, { studentId: id, limit: 50 }),
     getSessions(supabase, { from: new Date(), to: new Date(Date.now() + 60 * 86400000), studentId: id }),
-    // Teachers see only how many classes are left in the student's package, never prices.
-    supabase.rpc("classes_left", { p_student: id }),
   ]);
   const [homework, summaries] = await Promise.all([listHomework(supabase, { studentId: id }), getProgressSummaries(supabase, [id])]);
   const progress = summaries.get(id);
@@ -66,10 +64,6 @@ export default async function TeacherStudentPage({ params }: { params: Promise<{
             <div>
               <dt className="text-muted">Course</dt>
               <dd>{s?.course?.name ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-muted">Classes left in package</dt>
-              <dd className={typeof classesLeft === "number" && classesLeft <= 2 ? "font-semibold text-amber-700" : ""}>{classesLeft ?? "No package"}</dd>
             </div>
             <div>
               <dt className="text-muted">Level</dt>

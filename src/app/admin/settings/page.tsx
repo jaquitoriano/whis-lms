@@ -9,6 +9,8 @@ export const metadata = { title: "Website settings" };
 async function saveSettings(_prev: ActionState, formData: FormData): Promise<ActionState> {
   "use server";
   const { supabase } = await requireRole("admin");
+  const lowAt = Number(formData.get("low_classes_alert_at"));
+  if (!Number.isInteger(lowAt) || lowAt < 0 || lowAt > 20) return { error: "The low-classes alert must be a whole number from 0 to 20." };
   const { error } = await supabase
     .from("settings")
     .upsert([
@@ -16,6 +18,7 @@ async function saveSettings(_prev: ActionState, formData: FormData): Promise<Act
       { key: "teachers_can_schedule", value: formData.get("teachers_can_schedule") === "on" },
       { key: "recordings_visible_by_default", value: formData.get("recordings_visible_by_default") === "on" },
       { key: "meetings_record_automatically", value: formData.get("meetings_record_automatically") === "on" },
+      { key: "low_classes_alert_at", value: lowAt },
     ]);
   if (error) return { error: "Could not save settings." };
   revalidatePath("/admin/settings");
@@ -62,6 +65,20 @@ export default async function SettingsPage() {
               </span>
             </span>
           </label>
+          <div className="text-sm">
+            <label className="font-medium" htmlFor="low_classes_alert_at">Alert teachers when a student has this many classes left</label>
+            <input
+              className="input mt-1 w-24"
+              id="low_classes_alert_at"
+              name="low_classes_alert_at"
+              type="number"
+              min={0}
+              max={20}
+              step={1}
+              defaultValue={typeof map.low_classes_alert_at === "number" ? map.low_classes_alert_at : 2}
+            />
+            <span className="mt-1 block text-muted">Teachers don&apos;t see the number of classes left; they get one alert at this level and one for each class after it.</span>
+          </div>
         </ActionForm>
       </section>
     </>

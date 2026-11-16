@@ -16,6 +16,7 @@ export const NOTIFICATION_TYPES: Record<Role, { type: string; label: string }[]>
     { type: "review_backlog", label: "Daily reminder of homework waiting more than 48 h" },
     { type: "message", label: "New message from a student" },
     { type: "progress_due", label: "Weekly reminder of students due a progress report" },
+    { type: "classes_low", label: "A student is running low on classes in their package" },
     { type: "announcement", label: "School announcements" },
     { type: "policy_updated", label: "Class policies updated" },
   ],

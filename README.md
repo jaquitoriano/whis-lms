@@ -109,7 +109,7 @@ Run it after every database change.
 
 | Command | What it checks | Needs |
 |---|---|---|
-| `npm run test:rls` | 80 database rules: privacy (who can see and change what, including student contact details being admin-only), double-booking, private files, homework workflow, notifications, announcements, policies, Phase 5 (billing privacy, invoice totals and balances, no overpaying, void instead of delete, package usage, attendance, contract signing, teacher pay) and Phase 6 (report and score privacy, draft → published, IELTS band rounding, who is due a report, who can read and write each conversation, attachments, admin audit) and Phase 7 (who can add, share and see recordings, the sharing default, reports for admins only, report figures match the records) and Phase 7b (who connects teachers to Zoom or Google and sees the link queue; what booking, moving, cancelling and pasting a link queue up; retries). The files run one after another, because some tests briefly change shared data | local database |
+| `npm run test:rls` | 81 database rules: privacy (who can see and change what, including student contact details being admin-only), double-booking, private files, homework workflow, notifications, announcements, policies, Phase 5 (billing privacy, invoice totals and balances, no overpaying, void instead of delete, package usage, low-classes alerts for teachers, attendance, contract signing, teacher pay) and Phase 6 (report and score privacy, draft → published, IELTS band rounding, who is due a report, who can read and write each conversation, attachments, admin audit) and Phase 7 (who can add, share and see recordings, the sharing default, reports for admins only, report figures match the records) and Phase 7b (who connects teachers to Zoom or Google and sees the link queue; what booking, moving, cancelling and pasting a link queue up; retries). The files run one after another, because some tests briefly change shared data | local database |
 | `npm run test:smoke` | Every portal page renders the right content for each role, and other people's pages are refused | local database + `npm run dev` |
 | `npm run test:e2e` | Real browser walk-through: schedule, autosave notes, upload, YouTube, complete, student view, reschedule | local database + `npm run dev`; first run `npx playwright install chromium` |
 | `npm run test:e2e:homework` | Real browser walk-through of homework: assign, draft, photo upload, submit, review, revision, version 2, complete | same as above |
@@ -136,7 +136,8 @@ Run `npm run db:reset` first if you have changed data by hand: the tests expect 
 
 ## Change requests from the school (Nov 2026)
 
-- **Student contact details are admin-only** (T2). Teachers no longer see a student's email, phone or guardian details, on screen or through the database. They keep name, photo, course, level, schedule, lessons, homework and progress. Whether teachers should also lose "classes left" and "enrolled" is waiting on the school.
+- **Student contact details are admin-only** (T2). Teachers no longer see a student's email, phone or guardian details, on screen or through the database. They keep name, photo, course, level, schedule, lessons, homework and progress. Teachers keep the enrollment date.
+- **Classes left are hidden from teachers** (answer to question 1). Teachers keep the enrollment date. Instead, each of the student's teachers gets an alert when the student's active packages drop to the level set in Website settings (default 2), once per level (2, 1, 0 left) and package. Students and the school office still see the number.
 
 ## Decisions made for Phase 7, part 1 (Nov 2026, change if needed)
 
