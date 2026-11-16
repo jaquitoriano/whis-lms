@@ -100,7 +100,7 @@ Run it after every database change.
 
 | Command | What it checks | Needs |
 |---|---|---|
-| `npm run test:rls` | 67 database rules: privacy (who can see and change what), double-booking, private files, homework workflow, notifications, announcements, policies, Phase 5 (billing privacy, invoice totals and balances, no overpaying, void instead of delete, package usage, attendance, contract signing, teacher pay) and Phase 6 (report and score privacy, draft → published, IELTS band rounding, who is due a report, who can read and write each conversation, attachments, admin audit) and Phase 7 (who can add, share and see recordings, the sharing default, reports for admins only, report figures match the records). The files run one after another, because some tests briefly change shared data | local database |
+| `npm run test:rls` | 69 database rules: privacy (who can see and change what, including student contact details being admin-only), double-booking, private files, homework workflow, notifications, announcements, policies, Phase 5 (billing privacy, invoice totals and balances, no overpaying, void instead of delete, package usage, attendance, contract signing, teacher pay) and Phase 6 (report and score privacy, draft → published, IELTS band rounding, who is due a report, who can read and write each conversation, attachments, admin audit) and Phase 7 (who can add, share and see recordings, the sharing default, reports for admins only, report figures match the records). The files run one after another, because some tests briefly change shared data | local database |
 | `npm run test:smoke` | Every portal page renders the right content for each role, and other people's pages are refused | local database + `npm run dev` |
 | `npm run test:e2e` | Real browser walk-through: schedule, autosave notes, upload, YouTube, complete, student view, reschedule | local database + `npm run dev`; first run `npx playwright install chromium` |
 | `npm run test:e2e:homework` | Real browser walk-through of homework: assign, draft, photo upload, submit, review, revision, version 2, complete | same as above |
@@ -112,6 +112,10 @@ Run it after every database change.
 Run `npm run db:reset` first if you have changed data by hand: the tests expect the seed data.
 
 **The tests only run against a local database.** They read `.env.local` and refuse to start if it points anywhere else. If your `.env.local` points to a hosted project, keep the local settings in another file and name it for the tests and the app: `$env:ENV_FILE=".env.test"` for the tests (PowerShell), plus the same values as process variables for `npm run dev`, which take priority over `.env.local`.
+
+## Change requests from the school (Nov 2026)
+
+- **Student contact details are admin-only** (T2). Teachers no longer see a student's email, phone or guardian details, on screen or through the database. They keep name, photo, course, level, schedule, lessons, homework and progress. Whether teachers should also lose "classes left" and "enrolled" is waiting on the school.
 
 ## Decisions made for Phase 7, part 1 (Nov 2026, change if needed)
 
