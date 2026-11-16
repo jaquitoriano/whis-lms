@@ -5,6 +5,7 @@ import { ActionForm } from "@/components/ActionForm";
 import { Avatar, PageHeader, StatusBadge, formatDate } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
 import { StudentPackages } from "@/components/billing/StudentPackages";
+import { MeetingAccountCard } from "@/components/admin/MeetingAccountCard";
 import {
   addGuardian,
   assignTeacher,
@@ -172,6 +173,7 @@ async function TeacherSection({ id }: { id: string }) {
           <p className="text-sm text-muted">No students assigned. Assign a teacher from a student&apos;s page.</p>
         )}
       </section>
+      <MeetingAccountCard supabase={supabase} teacherId={id} />
     </>
   );
 }

@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNotificationEmail } from "@/lib/email";
+import { collectRecordings, runMeetingSync } from "@/lib/meetings/sync";
 
-// Scheduled job (every ~15 minutes): creates time-based notifications (class reminders,
+// Scheduled job (every ~15 minutes): creates time-based notifications and keeps Zoom / Google Meet links in step (class reminders,
 // homework due soon, review backlog, scheduled announcements, payment reminders, monthly
 // statements, contract expiry, progress reports due), then emails everything
 // pending. Call with:  Authorization: Bearer <CRON_SECRET>
@@ -25,6 +26,15 @@ async function run(request: NextRequest) {
   // Phase 6: weekly reminder to teachers about students due a progress report.
   const prog = await db.rpc("generate_progress_notifications");
   if (prog.error) return NextResponse.json({ error: prog.error.message }, { status: 500 });
+  // Phase 7b: retry Zoom / Google Meet links still waiting, then attach recordings (before the
+  // emails, so "recording available" goes out in this run). A Zoom or Google outage never
+  // stops the notification emails.
+  let meetings: unknown = null;
+  try {
+    meetings = { links: await runMeetingSync({ limit: 50 }), recordings: await collectRecordings(30) };
+  } catch (e) {
+    meetings = { error: String((e as Error).message).slice(0, 300) };
+  }
 
   const { data: pending, error } = await db
     .from("notifications")
@@ -58,7 +68,7 @@ async function run(request: NextRequest) {
         .eq("id", n.id);
     }
   }
-  return NextResponse.json({ generated: gen.data, billing: bill.data, progress: prog.data, sent, failed, more: (pending ?? []).length === BATCH });
+  return NextResponse.json({ generated: gen.data, billing: bill.data, progress: prog.data, meetings, sent, failed, more: (pending ?? []).length === BATCH });
 }
 
 export const GET = run;

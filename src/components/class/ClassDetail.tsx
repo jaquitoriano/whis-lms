@@ -17,6 +17,7 @@ import { listHomework } from "@/lib/homework";
 import { HomeworkStatusBadges } from "@/components/homework/HomeworkTable";
 import { addMaterialLink, addVideo, deleteMaterial, deleteVideo, updateMeetingLink } from "@/lib/session-actions";
 import { openConversation } from "@/lib/message-actions";
+import { retryMeeting } from "@/lib/meeting-actions";
 import type { Profile } from "@/lib/types";
 
 type Material = {
@@ -74,6 +75,10 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
   const other = isStudent ? s.teacher : s.student;
   const otherTz = other?.timezone && other.timezone !== tz ? other.timezone : null;
   const active = s.status === "scheduled";
+  // Phase 7b: the automatic Zoom / Google Meet link, for the class's staff only.
+  const { data: meeting } = canManage
+    ? await supabase.from("class_meetings").select("provider, join_url, action, attempts, last_error, deleted_at").eq("session_id", id).maybeSingle()
+    : { data: null };
   const backHref = `/${viewer.role}/calendar?view=week&date=${toDateStr(new Date(s.starts_at), tz)}`;
 
   return (
@@ -151,7 +156,8 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
               Join class
             </a>
           )}
-          {!s.meeting_url && active && <p className="text-sm text-muted">The meeting link will appear here.</p>}
+          {!s.meeting_url && active && !meeting && <p className="text-sm text-muted">The meeting link will appear here.</p>}
+          {meeting && active && <MeetingStatus sessionId={id} meeting={meeting} meetingUrl={s.meeting_url} />}
           {/* MSG-01: class-linked conversation, for the class's own teacher and student. */}
           {(isOwnerTeacher || (isStudent && s.student_id === viewer.id)) && (
             <form action={openConversation}>
@@ -379,4 +385,32 @@ function LessonRecordView({ rec }: { rec: LessonRecord }) {
       })}
     </div>
   );
+}
+
+type MeetingRow = { provider: "zoom" | "google_meet"; join_url: string | null; action: string | null; attempts: number; last_error: string | null; deleted_at: string | null };
+
+// Where the automatic link stands: being made, failed (with the reason and a retry), or made.
+function MeetingStatus({ sessionId, meeting, meetingUrl }: { sessionId: string; meeting: MeetingRow; meetingUrl: string | null }) {
+  const name = meeting.provider === "zoom" ? "Zoom" : "Google Meet";
+  if (meeting.deleted_at) return null;
+  if (meeting.last_error) {
+    const stopped = meeting.attempts >= 8;
+    return (
+      <div className="w-full rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p>
+          The {name} link could not be {meeting.action === "delete" ? "removed" : meeting.action === "update" ? "moved to the new time" : "created"}: {meeting.last_error}
+        </p>
+        <p className="mt-1">{stopped ? "Automatic retries have stopped." : "It will be tried again automatically."}</p>
+        <form action={retryMeeting.bind(null, sessionId)} className="mt-2">
+          <SubmitButton className="btn-secondary" pendingText="Retrying…">
+            Try again now
+          </SubmitButton>
+        </form>
+      </div>
+    );
+  }
+  if (meeting.action === "create" || meeting.action === "refresh") return <p className="text-sm text-muted">Creating the {name} link… refresh the page in a moment.</p>;
+  if (meeting.action === "update") return <p className="text-sm text-muted">Moving the {name} meeting to the new time…</p>;
+  if (meeting.join_url && meeting.join_url === meetingUrl) return <p className="text-sm text-muted">{name} link created automatically.</p>;
+  return null;
 }
