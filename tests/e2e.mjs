@@ -52,11 +52,11 @@ try {
   { const t = await alertText(); ok("class outside available hours asks for confirmation", t.includes("available hours"), "alert=" + t + " url=" + page.url()); if (page.url().includes("/classes/")) created.push(page.url().split("/").pop()); }
   // 5. lesson record autosave
   await page.goto(B + `/teacher/classes/${id}`);
-  ok("previous lesson is prefilled", (await page.inputValue("#previous_summary")).length > 0);
-  await page.fill("#today_objectives", "E2E objective: Part 3 answers");
+  ok("Previous Lesson box is filled from the last class", /Recommendations:/.test(await page.inputValue("#previous_note")));
+  await page.fill("#today_note", "Topics covered: E2E objective: Part 3 answers");
   await page.waitForFunction(() => /Saved/.test(document.body.innerText), null, { timeout: 10000 });
   await page.reload();
-  ok("lesson notes autosave and survive a reload", (await page.inputValue("#today_objectives")) === "E2E objective: Part 3 answers");
+  ok("lesson notes autosave and survive a reload", (await page.inputValue("#today_note")) === "Topics covered: E2E objective: Part 3 answers");
   // 6. upload a material file
   await page.setInputFiles("input[name=file]", TMP_PDF); await page.fill("input[name=title]", "E2E worksheet");
   await page.click("button:has-text('Upload file')"); await page.waitForSelector("a:has-text('E2E worksheet')", { timeout: 15000 });

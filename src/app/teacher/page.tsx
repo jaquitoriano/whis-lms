@@ -12,6 +12,7 @@ import { getProgressDue } from "@/lib/progress";
 import { unreadMessageCount } from "@/lib/messages";
 import { formatPlainDate } from "@/lib/progress-shared";
 import { Avatar, PageHeader, StatCard } from "@/components/ui";
+import { hasLessonNotes } from "@/lib/lesson-fields";
 
 export const metadata = { title: "Teacher dashboard" };
 
@@ -34,7 +35,7 @@ export default async function TeacherDashboard() {
   const todayActive = todays.filter((s) => s.status !== "cancelled" && s.status !== "rescheduled");
   const upcomingActive = upcoming.filter((s) => s.status === "scheduled");
   const needsNotes = history.filter(
-    (r) => (r.status === "completed" && !(r.lesson?.feedback_overall || r.lesson?.today_topics)) || (r.status === "scheduled" && Date.parse(r.ends_at) < Date.now()),
+    (r) => (r.status === "completed" && !hasLessonNotes(r.lesson)) || (r.status === "scheduled" && Date.parse(r.ends_at) < Date.now()),
   );
 
   return (

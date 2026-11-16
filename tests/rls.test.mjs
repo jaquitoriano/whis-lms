@@ -235,7 +235,7 @@ test("student reads shared lesson records but not private notes or unshared draf
   assert.equal(draft.data.length, 0, "unshared record hidden");
   const priv = await kenji.from("lesson_private_notes").select("*");
   assert.equal(priv.data.length, 0);
-  const write = await kenji.from("lesson_records").update({ feedback_overall: "hacked" }).eq("session_id", SESSION.kenjiDone1).select();
+  const write = await kenji.from("lesson_records").update({ feedback_note: "hacked" }).eq("session_id", SESSION.kenjiDone1).select();
   assert.equal((write.data ?? []).length, 0);
 });
 
@@ -299,11 +299,25 @@ test("teacher cannot record a teacher absence; reschedule keeps history", async 
   }
 });
 
-test("lesson record prefills Previous lesson from the last completed class", async () => {
+test("lesson record fills Previous Lesson from the last class's Next Lesson box", async () => {
   const maria = await as("teacher1@school.test");
-  const { data } = await maria.from("lesson_records").select("previous_session_id, previous_summary").eq("session_id", SESSION.kenjiUpcoming).single();
+  const { data } = await maria.from("lesson_records").select("previous_session_id, previous_note").eq("session_id", SESSION.kenjiUpcoming).single();
   assert.equal(data.previous_session_id, "20000000-0000-4000-a000-000000000002");
-  assert.match(data.previous_summary, /conclusions/i);
+  assert.match(data.previous_note, /Speaking Part 3 abstract questions/);
+});
+
+test("old lesson fields are merged into the four boxes, nothing lost", async () => {
+  const maria = await as("teacher1@school.test");
+  const { data } = await maria.from("lesson_records").select("*").eq("session_id", SESSION.kenjiDone1).single();
+  assert.match(data.today_note, /^Objectives: Plan and write an IELTS Task 2 opinion essay$/m);
+  assert.match(data.today_note, /^Topics covered: Task 2 structure; thesis statements$/m);
+  assert.match(data.today_note, /^Vocabulary and grammar: Linking words/m);
+  assert.match(data.today_note, /^Skills practised: Writing, Speaking$/m);
+  assert.equal(data.next_note, "Recommendations: Finish the essay and review conclusions");
+  assert.match(data.feedback_note, /^Overall performance: Good progress; ideas are clear$/m);
+  assert.match(data.feedback_note, /^Grammar and vocabulary corrections: "peoples" -> "people"/m);
+  assert.match(data.feedback_note, /^Pronunciation and fluency: Clear; work on word stress/m);
+  assert.equal(data.feedback_overall, "Good progress; ideas are clear", "old column kept");
 });
 
 test("material files are private to the class", async () => {

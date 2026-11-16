@@ -2,25 +2,27 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { saveLessonRecord, setLessonShared } from "@/lib/session-actions";
-import { LESSON_SECTIONS, SKILLS, type LessonField, type LessonRecord } from "@/lib/lesson-fields";
+import { LESSON_BOXES, LESSON_NOTE_MAX, type LessonBox, type LessonRecord } from "@/lib/lesson-fields";
 
-type Values = Record<LessonField, string> & { today_skills: string[]; private_notes: string };
+type Values = Record<LessonBox, string> & { private_notes: string };
 
 // Lesson record with autosave (LES-05 / NFR-32): changes are saved ~1.5 s after the
 // teacher stops typing, and again when they leave the page.
+// Four large boxes (change request T4). An empty box shows its template of labels;
+// the template is only saved once the teacher writes in that box.
 export function LessonRecordEditor({
   sessionId,
   record,
   privateNotes,
-  previousHref,
 }: {
   sessionId: string;
   record: LessonRecord;
   privateNotes: string;
-  previousHref?: string;
 }) {
-  const initial = Object.fromEntries(LESSON_SECTIONS.flatMap((s) => s.fields.map((f) => [f.name, record[f.name] ?? ""]))) as Record<LessonField, string>;
-  const [values, setValues] = useState<Values>({ ...initial, today_skills: record.today_skills ?? [], private_notes: privateNotes });
+  const [values, setValues] = useState<Values>({
+    ...(Object.fromEntries(LESSON_BOXES.map((b) => [b.name, record[b.name] || b.template])) as Record<LessonBox, string>),
+    private_notes: privateNotes,
+  });
   const [status, setStatus] = useState<"saved" | "dirty" | "saving" | "error">("saved");
   const [savedAt, setSavedAt] = useState<string>(record.updated_at);
   const [shared, setShared] = useState(record.shared_with_student);
@@ -99,54 +101,21 @@ export function LessonRecordEditor({
         </label>
       </div>
 
-      {LESSON_SECTIONS.map((section) => (
-        <fieldset key={section.key} className="space-y-3">
-          <legend className="mb-1 font-semibold">
-            {section.title}
-            {section.key === "previous" && previousHref && (
-              <a href={previousHref} className="ml-2 text-xs font-normal text-brand-700 hover:underline">
-                open previous class
-              </a>
-            )}
-          </legend>
-          {section.hint && <p className="-mt-2 text-xs text-muted">{section.hint}</p>}
-          {section.key === "today" && (
-            <div>
-              <p className="label">Skills practised</p>
-              <div className="flex flex-wrap gap-3">
-                {SKILLS.map((s) => (
-                  <label key={s} className="flex items-center gap-1.5 text-sm capitalize">
-                    <input
-                      type="checkbox"
-                      checked={values.today_skills.includes(s)}
-                      onChange={(e) =>
-                        update("today_skills", e.target.checked ? [...values.today_skills, s] : values.today_skills.filter((x) => x !== s))
-                      }
-                    />
-                    {s}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="grid gap-3 md:grid-cols-2">
-            {section.fields.map((f) => (
-              <div key={f.name}>
-                <label className="label" htmlFor={f.name}>
-                  {f.label}
-                </label>
-                <textarea
-                  id={f.name}
-                  className="input min-h-20"
-                  value={values[f.name]}
-                  maxLength={10000}
-                  onChange={(e) => update(f.name, e.target.value)}
-                  onBlur={() => void flush()}
-                />
-              </div>
-            ))}
-          </div>
-        </fieldset>
+      {LESSON_BOXES.map((box) => (
+        <div key={box.name}>
+          <label className="mb-1 block font-semibold" htmlFor={box.name}>
+            {box.title}
+          </label>
+          {"hint" in box && <p className="mb-2 text-xs text-muted">{box.hint}</p>}
+          <textarea
+            id={box.name}
+            className="input min-h-44 leading-relaxed"
+            value={values[box.name]}
+            maxLength={LESSON_NOTE_MAX}
+            onChange={(e) => update(box.name, e.target.value)}
+            onBlur={() => void flush()}
+          />
+        </div>
       ))}
 
       <fieldset>

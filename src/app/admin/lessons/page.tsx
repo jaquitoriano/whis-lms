@@ -2,6 +2,7 @@ import { requireRole } from "@/lib/auth";
 import { LessonList } from "@/components/class/LessonList";
 import { PageHeader, Pager, paginate } from "@/components/ui";
 import { getLessonHistory } from "@/lib/lesson-history";
+import { hasLessonNotes } from "@/lib/lesson-fields";
 
 export const metadata = { title: "Lesson records" };
 
@@ -9,8 +10,8 @@ export default async function AdminLessonsPage({ searchParams }: { searchParams:
   const { supabase, profile } = await requireRole("admin");
   const { missing, page } = await searchParams;
   let rows = await getLessonHistory(supabase, { limit: 300 });
-  const missingCount = rows.filter((r) => r.status === "completed" && !(r.lesson?.feedback_overall || r.lesson?.today_topics)).length;
-  if (missing) rows = rows.filter((r) => r.status === "completed" && !(r.lesson?.feedback_overall || r.lesson?.today_topics));
+  const missingCount = rows.filter((r) => r.status === "completed" && !hasLessonNotes(r.lesson)).length;
+  if (missing) rows = rows.filter((r) => r.status === "completed" && !hasLessonNotes(r.lesson));
   const list = paginate(rows, page);
   return (
     <>

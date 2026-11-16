@@ -3,8 +3,9 @@ import { EmptyState } from "@/components/ui";
 import { classPath, statusLabel, statusStyle, type SessionRow } from "@/lib/sessions";
 import { formatDateTime } from "@/lib/time";
 import type { Role } from "@/lib/types";
+import { hasLessonNotes, noteSummary } from "@/lib/lesson-fields";
 
-export type LessonListRow = SessionRow & { lesson: { feedback_overall: string; today_topics: string; shared_with_student: boolean } | null };
+export type LessonListRow = SessionRow & { lesson: { today_note: string; feedback_note: string; shared_with_student: boolean } | null };
 
 // A table of past classes with a short summary of each lesson record (LES-04, STU lesson history).
 export function LessonList({ rows, viewer, tz, empty }: { rows: LessonListRow[]; viewer: Role; tz: string; empty: string }) {
@@ -23,7 +24,8 @@ export function LessonList({ rows, viewer, tz, empty }: { rows: LessonListRow[];
         </thead>
         <tbody className="divide-y divide-border">
           {rows.map((r) => {
-            const hasNotes = !!(r.lesson && (r.lesson.feedback_overall || r.lesson.today_topics));
+            const hasNotes = hasLessonNotes(r.lesson);
+            const topics = noteSummary(r.lesson?.today_note);
             const who = viewer === "student" ? r.teacher?.full_name : viewer === "teacher" ? r.student?.full_name : `${r.teacher?.full_name} → ${r.student?.full_name}`;
             const missingNotes = r.status === "completed" && !hasNotes;
             return (
@@ -35,7 +37,7 @@ export function LessonList({ rows, viewer, tz, empty }: { rows: LessonListRow[];
                   {/* On phones the other columns are hidden and their details sit under the date. */}
                   <div className="mt-1 space-y-1 text-xs text-muted sm:hidden">
                     <p>{who}</p>
-                    {r.lesson?.today_topics && <p>{r.lesson.today_topics}</p>}
+                    {topics && <p>{topics}</p>}
                     <p>
                       <span className={`badge border ${statusStyle[r.status]}`}>{statusLabel[r.status]}</span>
                       {viewer !== "student" && missingNotes && <span className="ml-2 text-amber-700">Notes missing</span>}
@@ -43,7 +45,7 @@ export function LessonList({ rows, viewer, tz, empty }: { rows: LessonListRow[];
                   </div>
                 </td>
                 <td className="hidden px-4 py-3 sm:table-cell">{who}</td>
-                <td className="hidden max-w-xs truncate px-4 py-3 text-muted sm:table-cell">{r.lesson?.today_topics || "—"}</td>
+                <td className="hidden max-w-xs truncate px-4 py-3 text-muted sm:table-cell">{topics || "—"}</td>
                 <td className="hidden px-4 py-3 sm:table-cell">
                   <span className={`badge border ${statusStyle[r.status]}`}>{statusLabel[r.status]}</span>
                 </td>

@@ -11,7 +11,7 @@ export async function getLessonHistory(
 ) {
   let q = supabase
     .from("class_sessions")
-    .select(`${SESSION_SELECT}, lesson:lesson_records!lesson_records_session_id_fkey(feedback_overall, today_topics, shared_with_student)`)
+    .select(`${SESSION_SELECT}, lesson:lesson_records!lesson_records_session_id_fkey(today_note, feedback_note, shared_with_student)`)
     .lt("starts_at", new Date().toISOString())
     .not("status", "in", "(rescheduled)")
     .order("starts_at", { ascending: false })

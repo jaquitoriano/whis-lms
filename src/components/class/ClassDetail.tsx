@@ -11,7 +11,7 @@ import { AttendancePanel } from "./AttendancePanel";
 import { RecordingsPanel } from "./RecordingsPanel";
 import { getBillingSettings } from "@/lib/billing";
 import { getSession, statusLabel, statusStyle, classPath } from "@/lib/sessions";
-import { LESSON_SECTIONS, type LessonRecord } from "@/lib/lesson-fields";
+import { LESSON_BOXES, isBlankNote, type LessonRecord } from "@/lib/lesson-fields";
 import { formatDateTime, minutesBetween, toDateStr, toTimeStr, tzLabel } from "@/lib/time";
 import { listHomework } from "@/lib/homework";
 import { HomeworkStatusBadges } from "@/components/homework/HomeworkTable";
@@ -307,14 +307,16 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
 
       <section className="card">
         <h2 className="mb-4 font-semibold">Lesson record</h2>
+        {rec?.previous_session_id && (
+          <p className="-mt-2 mb-4 text-xs">
+            <Link href={classPath(viewer.role, rec.previous_session_id)} className="text-brand-700 hover:underline">
+              Open the previous class
+            </Link>
+          </p>
+        )}
         {canManage && rec ? (
-          <LessonRecordEditor
-            sessionId={id}
-            record={rec}
-            privateNotes={(priv as { notes: string } | null)?.notes ?? ""}
-            previousHref={rec.previous_session_id ? classPath(viewer.role, rec.previous_session_id) : undefined}
-          />
-        ) : rec ? (
+          <LessonRecordEditor sessionId={id} record={rec} privateNotes={(priv as { notes: string } | null)?.notes ?? ""} />
+        ) : rec && LESSON_BOXES.some((b) => !isBlankNote(rec[b.name])) ? (
           <LessonRecordView rec={rec} />
         ) : (
           <p className="text-sm text-muted">
@@ -355,34 +357,13 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
 
 function LessonRecordView({ rec }: { rec: LessonRecord }) {
   return (
-    <div className="space-y-6">
-      {LESSON_SECTIONS.map((section) => {
-        const filled = section.fields.filter((f) => rec[f.name]?.trim());
-        const skills = section.key === "today" && rec.today_skills?.length ? rec.today_skills : [];
-        if (!filled.length && !skills.length) return null;
-        return (
-          <div key={section.key}>
-            <h3 className="mb-2 font-medium">{section.title}</h3>
-            {skills.length > 0 && (
-              <p className="mb-2 flex flex-wrap gap-1">
-                {skills.map((s) => (
-                  <span key={s} className="badge bg-brand-50 capitalize text-brand-700">
-                    {s}
-                  </span>
-                ))}
-              </p>
-            )}
-            <dl className="grid gap-3 text-sm md:grid-cols-2">
-              {filled.map((f) => (
-                <div key={f.name}>
-                  <dt className="text-muted">{f.label}</dt>
-                  <dd className="whitespace-pre-line">{rec[f.name]}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        );
-      })}
+    <div className="space-y-5">
+      {LESSON_BOXES.filter((b) => !isBlankNote(rec[b.name])).map((b) => (
+        <div key={b.name}>
+          <h3 className="mb-1 font-medium">{b.title}</h3>
+          <p className="whitespace-pre-line text-sm">{rec[b.name]}</p>
+        </div>
+      ))}
     </div>
   );
 }
