@@ -83,13 +83,15 @@ test("students see only their own packages, invoices, payments and contracts", a
   assert.equal((await k.from("contract_sign_tokens").select("contract_id")).data.length, 0);
 });
 
-test("teachers see no prices, invoices, contracts or pay, only classes left for their own students", async () => {
+test("teachers see no prices, invoices, contracts, pay or classes left", async () => {
   const m = await maria();
   for (const t of ["invoices", "invoice_items", "payments", "enrollments", "contracts", "contract_signatures", "teacher_rates", "teacher_payouts", "contract_templates"]) {
     assert.equal((await m.from(t).select("*").limit(5)).data.length, 0, `teacher must not read ${t}`);
   }
-  assert.equal((await m.rpc("classes_left", { p_student: ID.kenji })).data, 18, "Kenji: 20 classes, 2 used");
-  assert.equal((await m.rpc("classes_left", { p_student: ID.ana })).data, null, "Ana isn't Maria's student");
+  // Change request (Nov 2026): the count is for the student and the office; teachers get an alert instead.
+  assert.equal((await m.rpc("classes_left", { p_student: ID.kenji })).data, null, "not even for their own student");
+  assert.equal((await (await as("student1@school.test")).rpc("classes_left", { p_student: ID.kenji })).data, 18, "Kenji: 20 classes, 2 used");
+  assert.equal((await (await admin()).rpc("classes_left", { p_student: ID.kenji })).data, 18, "the office sees it");
   assert.equal((await m.from("teacher_payouts").select("id").eq("teacher_id", ID.maria)).data.length, 0, "not even their own pay");
 });
 
@@ -378,4 +380,31 @@ test("billing job: overdue reminders once a week, due-soon reminders once", asyn
   assert.equal(soon.data.length, 1, "Min-jun's invoice is due in two days");
   const none = await s.from("notifications").select("id").eq("user_id", ID.ana).eq("type", "payment_reminder");
   assert.equal(none.data.length, 0, "Ana has paid");
+});
+
+test("teachers are alerted once per level when a student runs low on classes", async () => {
+  const db = svc();
+  const { data: enr } = await db.from("enrollments").select("id").eq("student_id", ID.kenji).eq("status", "active").limit(1).single();
+  await db.from("settings").upsert({ key: "low_classes_alert_at", value: 17 }); // Kenji has 18 left
+  const { data: s, error } = await db
+    .from("class_sessions")
+    .insert({ teacher_id: ID.maria, student_id: ID.kenji, enrollment_id: enr.id, starts_at: "2031-05-05T01:00:00Z", ends_at: "2031-05-05T01:50:00Z" })
+    .select("id")
+    .single();
+  assert.equal(error, null, error?.message);
+  const alerts = async () => (await db.from("notifications").select("user_id, body").eq("type", "classes_low").like("link", `%${ID.kenji}`)).data;
+  try {
+    assert.equal((await alerts()).length, 0, "nothing while booked");
+    await db.from("class_sessions").update({ status: "completed" }).eq("id", s.id);
+    const a = await alerts();
+    assert.deepEqual(a.map((x) => x.user_id), [ID.maria], "only the student's teacher");
+    assert.match(a[0].body, /17 classes left/);
+    await db.from("class_sessions").update({ status: "scheduled" }).eq("id", s.id);
+    await db.from("class_sessions").update({ status: "completed" }).eq("id", s.id);
+    assert.equal((await alerts()).length, 1, "the same level is not announced twice");
+  } finally {
+    await db.from("notifications").delete().eq("type", "classes_low");
+    await db.from("class_sessions").delete().eq("id", s.id);
+    await db.from("settings").upsert({ key: "low_classes_alert_at", value: 2 });
+  }
 });
