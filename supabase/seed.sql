@@ -130,6 +130,10 @@ insert into public.lesson_records (session_id, today_objectives, today_topics, t
   ('20000000-0000-4000-a000-000000000002', 'Write strong conclusions; Speaking Part 2 practice', 'Conclusions; cue-card strategy', 'Rewrote conclusion; two cue-card attempts', 'Hedging language: tend to, it could be argued', array['writing','speaking'],
    'Solid band 6.5 writing; speaking fluent but repetitive', 'Confident delivery', 'Range of vocabulary in Speaking', '"In conclusion, I am agree" -> "I agree"', 'Good intonation; final consonants sometimes dropped', 'Speaking Part 3 abstract questions; vocabulary for "environment"', true);
 
+-- The two records above use the old fields, like records made before change request T4;
+-- convert them into the four boxes the same way the migration converts live data.
+select public.convert_old_lesson_records();
+
 select public.ensure_lesson_record('20000000-0000-4000-a000-000000000003');
 
 insert into public.materials (session_id, title, unit_chapter, pages, kind, url, uploaded_by) values

@@ -6,7 +6,7 @@ import { getSession as getAuth } from "@/lib/auth";
 import { youtubeId } from "@/lib/sessions";
 import { addDays, isDateStr, zonedParts, zonedToUtc } from "@/lib/time";
 import type { ActionState } from "@/lib/types";
-import { LESSON_FIELDS, SKILLS, type LessonField } from "@/lib/lesson-fields";
+import { LESSON_BOX_NAMES, LESSON_NOTE_MAX, type LessonBox } from "@/lib/lesson-fields";
 import { syncSoon } from "@/lib/meetings/sync";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -224,13 +224,12 @@ export async function updateMeetingLink(sessionId: string, _prev: ActionState, f
 
 export async function saveLessonRecord(
   sessionId: string,
-  values: Partial<Record<LessonField, string>> & { today_skills?: string[]; private_notes?: string },
+  values: Partial<Record<LessonBox, string>> & { private_notes?: string },
 ): Promise<{ ok: boolean; savedAt?: string; error?: string }> {
   const { supabase, profile } = await auth();
   if (profile.role === "student") return { ok: false, error: "Not allowed." };
   const patch: Record<string, unknown> = { updated_by: profile.id };
-  for (const f of LESSON_FIELDS) if (typeof values[f] === "string") patch[f] = values[f]!.slice(0, 10000);
-  if (Array.isArray(values.today_skills)) patch.today_skills = values.today_skills.filter((s) => (SKILLS as readonly string[]).includes(s));
+  for (const b of LESSON_BOX_NAMES) if (typeof values[b] === "string") patch[b] = values[b]!.slice(0, LESSON_NOTE_MAX);
 
   await supabase.rpc("ensure_lesson_record", { p_session: sessionId });
   const { error, data } = await supabase.from("lesson_records").update(patch).eq("session_id", sessionId).select("updated_at");

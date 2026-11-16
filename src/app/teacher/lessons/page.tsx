@@ -2,6 +2,7 @@ import { requireRole } from "@/lib/auth";
 import { LessonList } from "@/components/class/LessonList";
 import { PageHeader, Pager, paginate } from "@/components/ui";
 import { getLessonHistory } from "@/lib/lesson-history";
+import { hasLessonNotes } from "@/lib/lesson-fields";
 
 export const metadata = { title: "Lesson Records" };
 
@@ -10,7 +11,7 @@ export default async function TeacherLessonsPage({ searchParams }: { searchParam
   const { page } = await searchParams;
   const rows = await getLessonHistory(supabase, { teacherId: profile.id, limit: 300 });
   const list = paginate(rows, page);
-  const missing = rows.filter((r) => r.status === "completed" && !(r.lesson?.feedback_overall || r.lesson?.today_topics)).length;
+  const missing = rows.filter((r) => r.status === "completed" && !hasLessonNotes(r.lesson)).length;
   return (
     <>
       <PageHeader title="Lesson records" description={missing ? `${missing} completed class${missing > 1 ? "es need" : " needs"} lesson notes.` : "All your past classes."} />

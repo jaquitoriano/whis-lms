@@ -1,5 +1,6 @@
 import Link from "@/components/Link";
 import { requireRole } from "@/lib/auth";
+import { isBlankNote } from "@/lib/lesson-fields";
 import { getMyEnrollment, getMyTeachers } from "@/lib/student-data";
 import { getSessions } from "@/lib/sessions";
 import { getLessonHistory } from "@/lib/lesson-history";
@@ -37,7 +38,7 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
   const teacher = teachers[0];
   const scheduled = upcoming.filter((s) => s.status === "scheduled" && Date.parse(s.ends_at) > now.getTime());
   const next = scheduled[0];
-  const lastFeedback = history.find((h) => h.lesson?.feedback_overall);
+  const lastFeedback = history.find((h) => !isBlankNote(h.lesson?.feedback_note));
 
   return (
     <>
@@ -113,7 +114,7 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
           {lastFeedback ? (
             <div className="text-sm">
               <p className="text-muted">{formatDateTime(lastFeedback.starts_at, tz)}</p>
-              <p className="mt-1">{lastFeedback.lesson!.feedback_overall}</p>
+              <p className="mt-1 line-clamp-6 whitespace-pre-line">{lastFeedback.lesson!.feedback_note}</p>
               <Link href={`/student/classes/${lastFeedback.id}`} className="mt-2 inline-block text-brand-700 hover:underline">
                 Read full notes →
               </Link>
