@@ -54,6 +54,14 @@ export const attendanceLabel: Record<AttendanceMark, string> = {
   cancelled: "Cancelled",
   rescheduled: "Rescheduled",
 };
+// "7 min, with notice": the extra detail shown after a Late mark.
+export function attendanceDetail(a: { minutes_late: number | null; with_notice?: boolean | null }, minutesWord = "min") {
+  const parts = [];
+  if (a.minutes_late) parts.push(`${a.minutes_late} ${minutesWord}`);
+  if (a.with_notice != null) parts.push(a.with_notice ? "with notice" : "without notice");
+  return parts.join(", ");
+}
+
 export const attendanceStyle: Record<AttendanceMark, string> = {
   present: "bg-green-50 text-green-700",
   late: "bg-amber-50 text-amber-700",

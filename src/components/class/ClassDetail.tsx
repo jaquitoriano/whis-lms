@@ -57,7 +57,7 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
     canManage ? supabase.from("lesson_private_notes").select("notes").eq("session_id", id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from("class_sessions").select("id").eq("rescheduled_from_id", id).maybeSingle(),
     listHomework(supabase, { sessionId: id }),
-    supabase.from("attendance").select("mark, minutes_late, note").eq("session_id", id).maybeSingle(),
+    supabase.from("attendance").select("mark, minutes_late, with_notice, note").eq("session_id", id).maybeSingle(),
     getBillingSettings(supabase),
     isAdmin
       ? supabase.from("enrollments").select("id, package_name, starts_on, status").eq("student_id", s.student_id).order("starts_on", { ascending: false })

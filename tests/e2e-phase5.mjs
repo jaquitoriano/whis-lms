@@ -178,11 +178,19 @@ try {
   const past = await makeClass(-60 * 24 * 9);
   made.classes.push(past);
   await james.goto(B + `/teacher/classes/${past}`);
-  await james.click("button:has-text('Completed, student late')");
+  ok("both late buttons are offered", (await james.locator("button:has-text('Completed, student late with notice')").count()) === 1
+    && (await james.locator("button:has-text('Completed, student late without notice')").count()) === 1);
+  await james.click("button:has-text('Completed, student late without notice')");
   await james.fill("#minutes_late", "7");
-  await james.click("button:has-text('Mark completed (late)')");
-  await james.waitForSelector("text=7 minutes late");
+  await james.click("button:has-text('Mark completed (late, without notice)')");
+  await james.waitForSelector("text=7 minutes late, without notice");
   ok("teacher marks the student late", (await main(james)).includes("Used up a class."));
+  const absent = await makeClass(-60 * 24 * 8);
+  made.classes.push(absent);
+  await james.goto(B + `/teacher/classes/${absent}`);
+  await james.click("button:has-text('Student absent with notice')");
+  await james.waitForSelector("text=/Absent\\s*with notice/");
+  ok("teacher marks the student absent with notice", (await svc.from("attendance").select("mark, with_notice").eq("session_id", absent).single()).data?.with_notice === true);
   const soon = await makeClass(120);
   made.classes.push(soon);
   await james.goto(B + `/teacher/classes/${soon}`);

@@ -1,8 +1,8 @@
 import { ActionForm } from "@/components/ActionForm";
-import { attendanceLabel, attendanceStyle, cancelPartyLabel, type AttendanceMark, type CancelParty } from "@/lib/billing-shared";
+import { attendanceLabel, attendanceStyle, cancelPartyLabel, attendanceDetail, type AttendanceMark, type CancelParty } from "@/lib/billing-shared";
 import { saveAttendance, setSessionBilling } from "@/lib/session-actions";
 
-type Attendance = { mark: AttendanceMark; minutes_late: number | null; note: string } | null;
+type Attendance = { mark: AttendanceMark; minutes_late: number | null; with_notice: boolean | null; note: string } | null;
 
 // ATT-01..02 on the class page, plus (admins only) which package the class belongs to and
 // whether it used up a class (OD-04).
@@ -49,12 +49,40 @@ export function AttendancePanel({
         <div className="space-y-1 text-sm">
           <p>
             <span className={`badge ${attendanceStyle[attendance.mark]}`}>{attendanceLabel[attendance.mark]}</span>
-            {attendance.minutes_late ? <span className="ml-2 text-muted">{attendance.minutes_late} minutes late</span> : null}
+            {(attendance.mark === "late" || attendance.mark === "absent") && attendanceDetail(attendance) ? (
+              <span className="ml-2 text-muted">{attendanceDetail(attendance, "minutes late")}</span>
+            ) : null}
           </p>
           {attendance.note && <p className="text-muted">{attendance.note}</p>}
         </div>
       )}
       <p className="mt-2 text-sm text-muted">{usageText}</p>
+
+      {canEdit && attendance && attendance.mark === "absent" && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-sm text-brand-700">Change attendance</summary>
+          <ActionForm action={saveAttendance.bind(null, sessionId)} className="mt-3 space-y-3" submitLabel="Save attendance">
+            <div>
+              <label className="label" htmlFor="att-notice-absent">Notice</label>
+              <select
+                className="input"
+                id="att-notice-absent"
+                name="notice"
+                required
+                defaultValue={attendance.with_notice == null ? "" : attendance.with_notice ? "with" : "without"}
+              >
+                <option value="">Choose…</option>
+                <option value="with">Absent with notice</option>
+                <option value="without">Absent without notice</option>
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="att-note-absent">Note (the student can see it)</label>
+              <input className="input" id="att-note-absent" name="note" defaultValue={attendance.note} maxLength={1000} />
+            </div>
+          </ActionForm>
+        </details>
+      )}
 
       {canEdit && attendance && (attendance.mark === "present" || attendance.mark === "late") && (
         <details className="mt-3">
@@ -71,6 +99,19 @@ export function AttendancePanel({
               <div>
                 <label className="label" htmlFor="att-minutes">Minutes late (if late)</label>
                 <input className="input w-28" id="att-minutes" name="minutes_late" type="number" min={1} max={240} defaultValue={attendance.minutes_late ?? ""} />
+              </div>
+              <div>
+                <label className="label" htmlFor="att-notice">Notice (if late)</label>
+                <select
+                  className="input"
+                  id="att-notice"
+                  name="notice"
+                  defaultValue={attendance.with_notice == null ? "" : attendance.with_notice ? "with" : "without"}
+                >
+                  <option value="">Choose…</option>
+                  <option value="with">With notice</option>
+                  <option value="without">Without notice</option>
+                </select>
               </div>
             </div>
             <div>

@@ -1,6 +1,6 @@
 import Link from "@/components/Link";
 import type { Statement } from "@/lib/billing";
-import { attendanceLabel, attendanceStyle, formatDateOnly, invoiceStatusLabel, methodLabel, money, monthLabel, nextMonthKey } from "@/lib/billing-shared";
+import { attendanceLabel, attendanceStyle, formatDateOnly, attendanceDetail, invoiceStatusLabel, methodLabel, money, monthLabel, nextMonthKey } from "@/lib/billing-shared";
 import { statusLabel } from "@/lib/sessions";
 import { formatDateTime, tzLabel } from "@/lib/time";
 
@@ -127,7 +127,7 @@ export function StatementView({
                       {c.attendance ? (
                         <span className={`badge ${attendanceStyle[c.attendance.mark]}`}>
                           {attendanceLabel[c.attendance.mark]}
-                          {c.attendance.minutes_late ? ` ${c.attendance.minutes_late} min` : ""}
+                          {attendanceDetail(c.attendance) ? ` ${attendanceDetail(c.attendance)}` : ""}
                         </span>
                       ) : (
                         "—"

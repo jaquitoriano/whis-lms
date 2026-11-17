@@ -26,7 +26,7 @@ export function StatusPanel({
 }) {
   const [state, action] = useActionState(setClassStatus.bind(null, sessionId), {});
   const [rState, rAction] = useActionState(rescheduleClass.bind(null, sessionId), {});
-  const [mode, setMode] = useState<"none" | "cancel" | "reschedule" | "late">("none");
+  const [mode, setMode] = useState<"none" | "cancel" | "reschedule" | "late_with" | "late_without">("none");
   const [requestedBy, setRequestedBy] = useState("");
   // Same rule as the database (OD-04), shown before confirming so nobody is surprised.
   // eslint-disable-next-line react-hooks/purity
@@ -52,11 +52,17 @@ export function StatusPanel({
         <button name="status" value="completed" className="btn-primary">
           Mark completed
         </button>
-        <button type="button" className="btn-secondary" onClick={() => setMode(mode === "late" ? "none" : "late")}>
-          Completed, student late
+        <button type="button" className="btn-secondary" onClick={() => setMode(mode === "late_with" ? "none" : "late_with")}>
+          Completed, student late with notice
         </button>
-        <button name="status" value="student_absent" className="btn-secondary">
-          Student absent
+        <button type="button" className="btn-secondary" onClick={() => setMode(mode === "late_without" ? "none" : "late_without")}>
+          Completed, student late without notice
+        </button>
+        <button name="status" value="student_absent_with" className="btn-secondary">
+          Student absent with notice
+        </button>
+        <button name="status" value="student_absent_without" className="btn-secondary">
+          Student absent without notice
         </button>
         {isAdmin && (
           <button name="status" value="teacher_absent" className="btn-secondary">
@@ -71,15 +77,16 @@ export function StatusPanel({
         </button>
       </form>
 
-      {mode === "late" && (
-        <form action={action} className="flex flex-wrap items-end gap-2 rounded-lg border border-border p-3">
+      {(mode === "late_with" || mode === "late_without") && (
+        <form key={mode} action={action} className="flex flex-wrap items-end gap-2 rounded-lg border border-border p-3">
           <input type="hidden" name="status" value="completed" />
           <input type="hidden" name="attendance" value="late" />
+          <input type="hidden" name="notice" value={mode === "late_with" ? "with" : "without"} />
           <div>
             <label className="label" htmlFor="minutes_late">Minutes late</label>
             <input className="input w-28" id="minutes_late" name="minutes_late" type="number" min={1} max={240} defaultValue={10} required />
           </div>
-          <SubmitButton pendingText="Saving…">Mark completed (late)</SubmitButton>
+          <SubmitButton pendingText="Saving…">{mode === "late_with" ? "Mark completed (late, with notice)" : "Mark completed (late, without notice)"}</SubmitButton>
         </form>
       )}
 
