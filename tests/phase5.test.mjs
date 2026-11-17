@@ -253,6 +253,34 @@ test("attendance follows the class; the teacher can mark late but not change cha
   }
 });
 
+test("absent with notice uses no class; without notice it does, and changing the notice recounts", async () => {
+  const j = await james();
+  const a = await admin();
+  const made = [];
+  try {
+    const withNotice = await newClass(-14);
+    made.push(withNotice.id);
+    await j.from("class_sessions").update({ status: "student_absent" }).eq("id", withNotice.id);
+    assert.equal((await a.from("class_sessions").select("counts_as_used").eq("id", withNotice.id).single()).data.counts_as_used, true, "before the notice is saved");
+    assert.equal((await j.from("attendance").update({ with_notice: true }).eq("session_id", withNotice.id)).error, null);
+    let row = (await a.from("class_sessions").select("counts_as_used, attendance(mark, with_notice)").eq("id", withNotice.id).single()).data;
+    assert.deepEqual(row, { counts_as_used: false, attendance: { mark: "absent", with_notice: true } }, "with notice: no class used");
+
+    const without = await newClass(-15);
+    made.push(without.id);
+    await j.from("class_sessions").update({ status: "student_absent" }).eq("id", without.id);
+    await j.from("attendance").update({ with_notice: false }).eq("session_id", without.id);
+    assert.equal((await a.from("class_sessions").select("counts_as_used").eq("id", without.id).single()).data.counts_as_used, true, "without notice: a class used");
+
+    await j.from("attendance").update({ with_notice: false }).eq("session_id", withNotice.id);
+    assert.equal((await a.from("class_sessions").select("counts_as_used").eq("id", withNotice.id).single()).data.counts_as_used, true, "corrected to without notice");
+    const log = await a.from("audit_log").select("action").in("entity_id", made).eq("action", "session.usage_override");
+    assert.equal(log.data.length, 0, "a recount is not logged as an admin override");
+  } finally {
+    await a.from("class_sessions").delete().in("id", made);
+  }
+});
+
 test("a rescheduled class stays in the same package", async () => {
   const a = await admin();
   const c = await newClass(25);

@@ -2,7 +2,7 @@ import Link from "@/components/Link";
 import { requireRole } from "@/lib/auth";
 import { EmptyState, PageHeader, Pager, paginate } from "@/components/ui";
 import { getBillingSettings, monthRange } from "@/lib/billing";
-import { attendanceLabel, attendanceStyle, isMonthKey, monthLabel, nextMonthKey, type AttendanceMark } from "@/lib/billing-shared";
+import { attendanceLabel, attendanceStyle, attendanceDetail, isMonthKey, monthLabel, nextMonthKey, type AttendanceMark } from "@/lib/billing-shared";
 import { statusLabel, type SessionStatus } from "@/lib/sessions";
 import { formatDateTime, todayStr, tzLabel } from "@/lib/time";
 
@@ -17,7 +17,7 @@ type Row = {
   student_id: string;
   student: { full_name: string } | null;
   teacher: { full_name: string } | null;
-  attendance: { mark: AttendanceMark; minutes_late: number | null } | null;
+  attendance: { mark: AttendanceMark; minutes_late: number | null; with_notice: boolean | null } | null;
 };
 
 // ATT-01..02: every closed class with its attendance mark, by month.
@@ -32,7 +32,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   let q = supabase
     .from("class_sessions")
     .select(
-      "id, starts_at, status, counts_as_used, late_cancel, student_id, student:profiles!class_sessions_student_id_fkey(full_name), teacher:profiles!class_sessions_teacher_id_fkey(full_name), attendance(mark, minutes_late)",
+      "id, starts_at, status, counts_as_used, late_cancel, student_id, student:profiles!class_sessions_student_id_fkey(full_name), teacher:profiles!class_sessions_teacher_id_fkey(full_name), attendance(mark, minutes_late, with_notice)",
     )
     .gte("starts_at", from.toISOString())
     .lt("starts_at", to.toISOString())
@@ -172,7 +172,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
                     {r.attendance ? (
                       <span className={`badge ${attendanceStyle[r.attendance.mark]}`}>
                         {attendanceLabel[r.attendance.mark]}
-                        {r.attendance.minutes_late ? ` ${r.attendance.minutes_late} min` : ""}
+                        {attendanceDetail(r.attendance) ? ` ${attendanceDetail(r.attendance)}` : ""}
                       </span>
                     ) : (
                       <span className="text-muted">—</span>

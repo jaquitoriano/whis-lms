@@ -12,8 +12,6 @@ export function StatusPanel({
   defaultDate,
   defaultTime,
   tzLabel,
-  lateCancelHours,
-  startsAt,
 }: {
   sessionId: string;
   isAdmin: boolean;
@@ -21,17 +19,10 @@ export function StatusPanel({
   defaultDate: string;
   defaultTime: string;
   tzLabel: string;
-  lateCancelHours: number;
-  startsAt: string;
 }) {
   const [state, action] = useActionState(setClassStatus.bind(null, sessionId), {});
   const [rState, rAction] = useActionState(rescheduleClass.bind(null, sessionId), {});
-  const [mode, setMode] = useState<"none" | "cancel" | "reschedule" | "late">("none");
-  const [requestedBy, setRequestedBy] = useState("");
-  // Same rule as the database (OD-04), shown before confirming so nobody is surprised.
-  // eslint-disable-next-line react-hooks/purity
-  const insideCutoff = Date.parse(startsAt) - Date.now() < lateCancelHours * 3600000;
-
+  const [mode, setMode] = useState<"none" | "reschedule" | "late_with" | "late_without">("none");
   if (status !== "scheduled") {
     if (!isAdmin) return null;
     return (
@@ -52,11 +43,17 @@ export function StatusPanel({
         <button name="status" value="completed" className="btn-primary">
           Mark completed
         </button>
-        <button type="button" className="btn-secondary" onClick={() => setMode(mode === "late" ? "none" : "late")}>
-          Completed, student late
+        <button type="button" className="btn-secondary" onClick={() => setMode(mode === "late_with" ? "none" : "late_with")}>
+          Student late with notice
         </button>
-        <button name="status" value="student_absent" className="btn-secondary">
-          Student absent
+        <button type="button" className="btn-secondary" onClick={() => setMode(mode === "late_without" ? "none" : "late_without")}>
+          Student late without notice
+        </button>
+        <button name="status" value="student_absent_with" className="btn-secondary">
+          Student absent with notice
+        </button>
+        <button name="status" value="student_absent_without" className="btn-secondary">
+          Student absent without notice
         </button>
         {isAdmin && (
           <button name="status" value="teacher_absent" className="btn-secondary">
@@ -66,52 +63,18 @@ export function StatusPanel({
         <button type="button" className="btn-secondary" onClick={() => setMode(mode === "reschedule" ? "none" : "reschedule")}>
           Reschedule
         </button>
-        <button type="button" className="btn-danger" onClick={() => setMode(mode === "cancel" ? "none" : "cancel")}>
-          Cancel class
-        </button>
       </form>
 
-      {mode === "late" && (
-        <form action={action} className="flex flex-wrap items-end gap-2 rounded-lg border border-border p-3">
+      {(mode === "late_with" || mode === "late_without") && (
+        <form key={mode} action={action} className="flex flex-wrap items-end gap-2 rounded-lg border border-border p-3">
           <input type="hidden" name="status" value="completed" />
           <input type="hidden" name="attendance" value="late" />
+          <input type="hidden" name="notice" value={mode === "late_with" ? "with" : "without"} />
           <div>
             <label className="label" htmlFor="minutes_late">Minutes late</label>
             <input className="input w-28" id="minutes_late" name="minutes_late" type="number" min={1} max={240} defaultValue={10} required />
           </div>
-          <SubmitButton pendingText="Saving…">Mark completed (late)</SubmitButton>
-        </form>
-      )}
-
-      {mode === "cancel" && (
-        <form action={action} className="space-y-2 rounded-lg border border-red-100 bg-red-50/40 p-3">
-          <input type="hidden" name="status" value="cancelled" />
-          <fieldset>
-            <legend className="label">Who asked to cancel?</legend>
-            <div className="flex flex-wrap gap-4 text-sm">
-              {[
-                ["student", "The student"],
-                ["teacher", "The teacher"],
-                ["school", "The school"],
-              ].map(([v, l]) => (
-                <label key={v} className="flex items-center gap-2">
-                  <input type="radio" name="requested_by" value={v} required checked={requestedBy === v} onChange={() => setRequestedBy(v)} /> {l}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          {requestedBy === "student" && (
-            <p className={`rounded-lg px-3 py-2 text-xs ${insideCutoff ? "bg-amber-50 text-amber-800" : "bg-surface text-muted"}`}>
-              {insideCutoff
-                ? `This is less than ${lateCancelHours} hours before the class, so it will use up one of the student's classes. An admin can change this later.`
-                : `More than ${lateCancelHours} hours before the class: it won't use up a class.`}
-            </p>
-          )}
-          <label className="label" htmlFor="reason">Reason for cancelling</label>
-          <input className="input" id="reason" name="reason" required placeholder="e.g. Student requested, holiday" />
-          <SubmitButton className="btn-danger" pendingText="Cancelling…">
-            Confirm cancellation
-          </SubmitButton>
+          <SubmitButton pendingText="Saving…">{mode === "late_with" ? "Save: late with notice" : "Save: late without notice"}</SubmitButton>
         </form>
       )}
 

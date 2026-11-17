@@ -5,6 +5,7 @@ import { getSessions } from "@/lib/sessions";
 import { getLessonHistory } from "@/lib/lesson-history";
 import { addDays, todayStr, zonedToUtc } from "@/lib/time";
 import { SessionList } from "@/components/class/SessionList";
+import { Calendar, calendarRange } from "@/components/Calendar";
 import { HomeworkTable } from "@/components/homework/HomeworkTable";
 import { listHomework } from "@/lib/homework";
 import { AnnouncementsPanel } from "@/components/portal/Announcements";
@@ -20,7 +21,8 @@ export default async function TeacherDashboard() {
   const { supabase, profile } = await requireRole("teacher");
   const tz = profile.timezone;
   const today = todayStr(tz);
-  const [students, todays, upcoming, history, toReview, due, unread] = await Promise.all([
+  const month = calendarRange("month", today, tz);
+  const [students, todays, upcoming, history, toReview, due, unread, monthSessions] = await Promise.all([
     getMyStudents(supabase, profile.id),
     getSessions(supabase, { from: zonedToUtc(today, "00:00", tz), to: zonedToUtc(addDays(today, 1), "00:00", tz), teacherId: profile.id }),
     getSessions(supabase, { from: zonedToUtc(addDays(today, 1), "00:00", tz), to: zonedToUtc(addDays(today, 8), "00:00", tz), teacherId: profile.id }),
@@ -28,6 +30,7 @@ export default async function TeacherDashboard() {
     listHomework(supabase, { teacherId: profile.id, statuses: ["submitted", "under_review"] }),
     getProgressDue(supabase),
     unreadMessageCount(supabase),
+    getSessions(supabase, { from: month.from, to: month.to, teacherId: profile.id }),
   ]);
   const dueStudents = due
     .map((d) => ({ ...d, student: students.find((s) => s.student.id === d.student_id)?.student }))
@@ -51,7 +54,7 @@ export default async function TeacherDashboard() {
       />
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
         <StatCard label="Today's classes" value={todayActive.length} href={`/teacher/calendar?view=day&date=${today}`} />
-        <StatCard label="Next 7 days" value={upcomingActive.length} href="/teacher/calendar" />
+        <StatCard label="Next 7 days" value={upcomingActive.length} href="/teacher/calendar?view=week" />
         <StatCard label="Assigned students" value={students.length} href="/teacher/students" />
         <StatCard label="Classes needing notes" value={needsNotes.length} href="/teacher/lessons" />
         <StatCard label="Homework to review" value={toReview.length} href="/teacher/homework" />
@@ -62,6 +65,10 @@ export default async function TeacherDashboard() {
           You have unread messages in {unread} conversation{unread > 1 ? "s" : ""} →
         </Link>
       )}
+
+      <section className="card mt-6">
+        <Calendar sessions={monthSessions} view="month" date={today} tz={tz} viewer="teacher" basePath="/teacher/calendar" />
+      </section>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="card">

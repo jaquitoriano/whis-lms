@@ -126,11 +126,11 @@ export type UsedClass = {
   cancel_requested_by: string | null;
   enrollment_id: string | null;
   teacher: { full_name: string } | null;
-  attendance: { mark: AttendanceMark; minutes_late: number | null } | null;
+  attendance: { mark: AttendanceMark; minutes_late: number | null; with_notice: boolean | null } | null;
 };
 
 export const USED_CLASS_SELECT =
-  "id, starts_at, ends_at, status, counts_as_used, late_cancel, cancel_requested_by, enrollment_id, teacher:profiles!class_sessions_teacher_id_fkey(full_name), attendance(mark, minutes_late)";
+  "id, starts_at, ends_at, status, counts_as_used, late_cancel, cancel_requested_by, enrollment_id, teacher:profiles!class_sessions_teacher_id_fkey(full_name), attendance(mark, minutes_late, with_notice)";
 
 export function monthRange(key: string, tz: string) {
   return { from: zonedToUtc(`${key}-01`, "00:00", tz), to: zonedToUtc(`${nextMonthKey(key)}-01`, "00:00", tz) };

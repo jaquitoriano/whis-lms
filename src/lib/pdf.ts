@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf
 import { site } from "@/config/site";
 import {
   attendanceLabel,
+  attendanceDetail,
   formatDateOnly,
   invoiceStatusLabel,
   methodLabel,
@@ -368,7 +369,7 @@ export async function statementPdf(s: Statement, viewerTz: string) {
         formatDateTime(c.starts_at, viewerTz),
         c.teacher?.full_name ?? "",
         statusLabel[c.status] + (c.late_cancel ? " (late)" : ""),
-        c.attendance ? attendanceLabel[c.attendance.mark] + (c.attendance.minutes_late ? ` ${c.attendance.minutes_late} min` : "") : "—",
+        c.attendance ? attendanceLabel[c.attendance.mark] + (attendanceDetail(c.attendance) ? ` ${attendanceDetail(c.attendance)}` : "") : "—",
         c.counts_as_used ? "Yes" : "No",
       ]),
     );

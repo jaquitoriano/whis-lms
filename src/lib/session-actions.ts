@@ -109,9 +109,14 @@ export async function createClasses(_prev: ActionState, formData: FormData): Pro
 const TEACHER_STATUSES = ["completed", "cancelled", "student_absent"];
 const ADMIN_STATUSES = [...TEACHER_STATUSES, "teacher_absent", "scheduled"];
 
+// The two "Student absent" buttons: same status, with or without notice recorded on the attendance mark.
+const ABSENT_NOTICE: Record<string, boolean> = { student_absent_with: true, student_absent_without: false };
+
 export async function setClassStatus(sessionId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
   const { supabase, profile } = await auth();
-  const status = str(formData, "status");
+  const button = str(formData, "status");
+  const absentNotice = button in ABSENT_NOTICE ? ABSENT_NOTICE[button] : null;
+  const status = absentNotice === null ? button : "student_absent";
   const reason = str(formData, "reason") || null;
   const allowed = profile.role === "admin" ? ADMIN_STATUSES : profile.role === "teacher" ? TEACHER_STATUSES : [];
   if (!allowed.includes(status)) return { error: "You can't set that status." };
@@ -122,6 +127,8 @@ export async function setClassStatus(sessionId: string, _prev: ActionState, form
   const minutesLate = Number(formData.get("minutes_late") ?? 0);
   const late = status === "completed" && formData.get("attendance") === "late";
   if (late && (!Number.isInteger(minutesLate) || minutesLate < 1 || minutesLate > 240)) return { error: "Enter how many minutes late (1–240)." };
+  const notice = str(formData, "notice");
+  if (late && notice !== "with" && notice !== "without") return { error: "Say whether the student gave notice." };
 
   const patch: Record<string, unknown> = { status, status_reason: reason };
   if (status === "cancelled") patch.cancel_requested_by = requestedBy;
@@ -130,7 +137,8 @@ export async function setClassStatus(sessionId: string, _prev: ActionState, form
   if (!data?.length) return { error: "You don't have permission to change this class." };
   // ATT-02: the status sets a default mark (completed = present); a late arrival replaces it.
   if (status === "cancelled") syncSoon(); // removes the Zoom / Google meeting
-  if (late) await supabase.from("attendance").update({ mark: "late", minutes_late: minutesLate }).eq("session_id", sessionId);
+  if (late) await supabase.from("attendance").update({ mark: "late", minutes_late: minutesLate, with_notice: notice === "with" }).eq("session_id", sessionId);
+  if (absentNotice !== null) await supabase.from("attendance").update({ with_notice: absentNotice }).eq("session_id", sessionId);
 
   // Completing a class shares its lesson record with the student.
   if (status === "completed") {
@@ -151,11 +159,18 @@ export async function saveAttendance(sessionId: string, _prev: ActionState, form
   if (!cur) return { error: "Attendance is recorded when the class is closed." };
   // Absent, cancelled and rescheduled follow the class status; only completed classes have a choice.
   const patch: Record<string, unknown> = { note: str(formData, "note").slice(0, 1000) };
-  if (mark === "present" || mark === "late") {
+  if (cur.mark === "absent") {
+    const notice = str(formData, "notice");
+    if (notice !== "with" && notice !== "without") return { error: "Say whether the student gave notice." };
+    patch.with_notice = notice === "with";
+  } else if (mark === "present" || mark === "late") {
     if (cur.mark !== "present" && cur.mark !== "late") return { error: "Change the class status to change this mark." };
     if (mark === "late" && (!Number.isInteger(minutes) || minutes < 1 || minutes > 240)) return { error: "Enter how many minutes late (1–240)." };
+    const notice = str(formData, "notice");
+    if (mark === "late" && notice !== "with" && notice !== "without") return { error: "Say whether the student gave notice." };
     patch.mark = mark;
     patch.minutes_late = mark === "late" ? minutes : null;
+    patch.with_notice = mark === "late" ? notice === "with" : null;
   }
   const { error, data } = await supabase.from("attendance").update(patch).eq("session_id", sessionId).select("session_id");
   if (error) return { error: dbError(error) };
