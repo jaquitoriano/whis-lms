@@ -23,7 +23,7 @@ export type Blackout = { id: string; starts_at: string; ends_at: string; reason:
 export type Deadline = { id: string; title: string; due_at: string; href: string; done: boolean };
 
 export function parseCalendarParams(sp: { view?: string; date?: string }, tz: string) {
-  const view: CalendarView = sp.view === "month" || sp.view === "day" ? sp.view : "week";
+  const view: CalendarView = sp.view === "week" || sp.view === "day" ? sp.view : "month";
   const date: DateStr = isDateStr(sp.date) ? sp.date : todayStr(tz);
   return { view, date };
 }

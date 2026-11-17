@@ -77,7 +77,7 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
   const { data: meeting } = canManage
     ? await supabase.from("class_meetings").select("provider, join_url, action, attempts, last_error, deleted_at").eq("session_id", id).maybeSingle()
     : { data: null };
-  const backHref = `/${viewer.role}/calendar?view=week&date=${toDateStr(new Date(s.starts_at), tz)}`;
+  const backHref = `/${viewer.role}/calendar?view=month&date=${toDateStr(new Date(s.starts_at), tz)}`;
 
   return (
     <div className="space-y-6">

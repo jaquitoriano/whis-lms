@@ -4,8 +4,9 @@ import { isBlankNote } from "@/lib/lesson-fields";
 import { getMyEnrollment, getMyTeachers } from "@/lib/student-data";
 import { getSessions } from "@/lib/sessions";
 import { getLessonHistory } from "@/lib/lesson-history";
-import { formatDateTime, minutesBetween, tzLabel } from "@/lib/time";
+import { formatDateTime, minutesBetween, todayStr, tzLabel } from "@/lib/time";
 import { SessionList } from "@/components/class/SessionList";
+import { Calendar, calendarRange } from "@/components/Calendar";
 import { HomeworkTable } from "@/components/homework/HomeworkTable";
 import { listHomework } from "@/lib/homework";
 import { AnnouncementsPanel } from "@/components/portal/Announcements";
@@ -20,7 +21,9 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
   const { supabase, profile } = await requireRole("student");
   const tz = profile.timezone;
   const now = new Date();
-  const [teachers, enrollment, upcoming, history, openHomework, { data: toSign }, { data: openInvoices }, { data: report }, { data: band }, unread] = await Promise.all([
+  const today = todayStr(tz);
+  const month = calendarRange("month", today, tz);
+  const [teachers, enrollment, upcoming, history, openHomework, { data: toSign }, { data: openInvoices }, { data: report }, { data: band }, unread, monthSessions] = await Promise.all([
     getMyTeachers(supabase, profile.id),
     getMyEnrollment(supabase, profile.id),
     getSessions(supabase, { from: new Date(now.getTime() - 60 * 60000), to: new Date(now.getTime() + 60 * 86400000), studentId: profile.id }),
@@ -32,7 +35,12 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
     supabase.from("progress_reports").select("overall, period_end").eq("student_id", profile.id).eq("status", "published").order("period_end", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("ielts_results").select("overall, kind, test_date").eq("student_id", profile.id).not("overall", "is", null).order("test_date", { ascending: false }).limit(1).maybeSingle(),
     unreadMessageCount(supabase),
+    getSessions(supabase, { from: month.from, to: month.to, studentId: profile.id }),
   ]);
+  // Open homework due this month shows on the calendar, as on the full calendar page.
+  const deadlines = openHomework
+    .filter((h) => h.due_at && Date.parse(h.due_at) >= month.from.getTime() && Date.parse(h.due_at) < month.to.getTime())
+    .map((h) => ({ id: h.id, title: h.title, due_at: h.due_at, href: `/student/homework/${h.id}`, done: false }));
   const contractToSign = (toSign ?? []).find((c) => c.signer_kind === "self");
   const overdueCount = (openInvoices ?? []).filter((i) => i.due_date < now.toISOString().slice(0, 10)).length;
   const teacher = teachers[0];
@@ -62,6 +70,10 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
         </Link>
       )}
       {policies === "accepted" && <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">Thank you. You have accepted the class policies.</p>}
+      <section className="card mb-6">
+        <Calendar sessions={monthSessions} view="month" date={today} tz={tz} viewer="student" basePath="/student/calendar" deadlines={deadlines} />
+      </section>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
         <section className="card border-brand-100">
           <h2 className="mb-2 font-semibold">Next class</h2>
