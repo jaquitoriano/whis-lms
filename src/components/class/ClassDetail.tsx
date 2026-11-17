@@ -9,7 +9,6 @@ import { YouTubePlayer } from "./YouTubePlayer";
 import { StatusPanel } from "./StatusPanel";
 import { AttendancePanel } from "./AttendancePanel";
 import { RecordingsPanel } from "./RecordingsPanel";
-import { getBillingSettings } from "@/lib/billing";
 import { getSession, statusLabel, statusStyle, classPath } from "@/lib/sessions";
 import { LESSON_BOXES, isBlankNote, type LessonRecord } from "@/lib/lesson-fields";
 import { formatDateTime, minutesBetween, toDateStr, toTimeStr, tzLabel } from "@/lib/time";
@@ -50,7 +49,7 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
 
   await (canManage ? supabase.rpc("ensure_lesson_record", { p_session: id }) : Promise.resolve());
   const isAdmin = viewer.role === "admin";
-  const [{ data: materials }, { data: videos }, { data: record }, { data: priv }, { data: next }, homework, { data: attendance }, settings, { data: enrollments }] = await Promise.all([
+  const [{ data: materials }, { data: videos }, { data: record }, { data: priv }, { data: next }, homework, { data: attendance }, { data: enrollments }] = await Promise.all([
     supabase.from("materials").select("*").eq("session_id", id).order("created_at"),
     supabase.from("videos").select("*").eq("session_id", id).order("created_at"),
     supabase.from("lesson_records").select("*").eq("session_id", id).maybeSingle(),
@@ -58,7 +57,6 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
     supabase.from("class_sessions").select("id").eq("rescheduled_from_id", id).maybeSingle(),
     listHomework(supabase, { sessionId: id }),
     supabase.from("attendance").select("mark, minutes_late, with_notice, note").eq("session_id", id).maybeSingle(),
-    getBillingSettings(supabase),
     isAdmin
       ? supabase.from("enrollments").select("id, package_name, starts_on, status").eq("student_id", s.student_id).order("starts_on", { ascending: false })
       : Promise.resolve({ data: null }),
@@ -178,8 +176,6 @@ export async function ClassDetail({ supabase, viewer, id }: { supabase: Supabase
               defaultDate={toDateStr(new Date(s.starts_at), tz)}
               defaultTime={toTimeStr(new Date(s.starts_at), tz)}
               tzLabel={tzLabel(tz)}
-              lateCancelHours={settings.late_cancel_hours}
-              startsAt={s.starts_at}
             />
             {active && (
               <ActionForm action={updateMeetingLink.bind(null, id)} submitLabel="Save link" className="flex flex-wrap items-start gap-2">
